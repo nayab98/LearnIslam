@@ -16,9 +16,8 @@ import { t } from "@/lib/translations";
 const categoryConfigs = [
   {
     id: "hadith",
-    labelEn: "Hadees Quiz",
-    labelUr: "Hadeeso ka Quiz",
-    description: "Test your knowledge of Prophet's sayings",
+    labelKey: "quiz_cat_hadith",
+    descKey: "quiz_cat_hadith_desc",
     icon: BookOpenText,
     color: "text-purple-600",
     bg: "bg-purple-50 dark:bg-purple-950/30",
@@ -27,9 +26,8 @@ const categoryConfigs = [
   },
   {
     id: "word-meaning",
-    labelEn: "Word Meaning",
-    labelUr: "Lafz ke Matlab",
-    description: "Match Arabic words with their meanings",
+    labelKey: "quiz_cat_word",
+    descKey: "quiz_cat_word_desc",
     icon: Type,
     color: "text-amber-600",
     bg: "bg-amber-50 dark:bg-amber-950/30",
@@ -38,9 +36,8 @@ const categoryConfigs = [
   },
   {
     id: "ayah-completion",
-    labelEn: "Ayah Completion",
-    labelUr: "Aayat Poori Karein",
-    description: "Complete the missing part of an ayah",
+    labelKey: "quiz_cat_ayah_comp",
+    descKey: "quiz_cat_ayah_comp_desc",
     icon: BookOpen,
     color: "text-emerald-600",
     bg: "bg-emerald-50 dark:bg-emerald-950/30",
@@ -49,9 +46,8 @@ const categoryConfigs = [
   },
   {
     id: "ayah-meaning",
-    labelEn: "Ayah Meaning",
-    labelUr: "Aayat ka Tarjuma",
-    description: "Pick correct translation of an ayah",
+    labelKey: "quiz_cat_ayah_mean",
+    descKey: "quiz_cat_ayah_mean_desc",
     icon: Languages,
     color: "text-blue-600",
     bg: "bg-blue-50 dark:bg-blue-950/30",
@@ -60,9 +56,8 @@ const categoryConfigs = [
   },
   {
     id: "general",
-    labelEn: "General Islamic",
-    labelUr: "Aam Islami Maloomat",
-    description: "Test your Islamic general knowledge",
+    labelKey: "quiz_cat_general",
+    descKey: "quiz_cat_general_desc",
     icon: GraduationCap,
     color: "text-rose-600",
     bg: "bg-rose-50 dark:bg-rose-950/30",
@@ -104,11 +99,11 @@ export default function QuizPage() {
               </div>
               <div className="flex items-center gap-2 mb-2">
                 <h3 className="text-xl font-bold">
-                  {lang === "hi" ? cat.labelUr : cat.labelEn}
+                  {t(cat.labelKey, lang)}
                 </h3>
               </div>
               <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                {cat.description}
+                {t(cat.descKey, lang)}
               </p>
               <ArrowRight
                 className={`absolute bottom-6 right-6 h-5 w-5 ${cat.color} opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all`}

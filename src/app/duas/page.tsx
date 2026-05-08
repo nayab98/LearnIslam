@@ -1,17 +1,47 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { BookHeart, Search } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { BookHeart, Search, Heart, Check } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { useArabicFont } from "@/lib/useArabicFont";
 import { DUAS, DUA_CATEGORIES, type Dua } from "@/lib/duas";
+import { addBookmark, getBookmarks, removeBookmark } from "@/lib/bookmarks";
+import { recordLearningEvent } from "@/lib/learning-events";
+import { createClient } from "@/lib/supabase/client";
+
+const CATEGORY_KEYS: Record<string, string> = {
+  All: "dua_category_all",
+  "Morning & Evening": "dua_category_morning_evening",
+  Salah: "dua_category_salah",
+  "Food & Drink": "dua_category_food_drink",
+  Travel: "dua_category_travel",
+  Sleep: "dua_category_sleep",
+  Masjid: "dua_category_masjid",
+  Protection: "dua_category_protection",
+  Forgiveness: "dua_category_forgiveness",
+  General: "dua_category_general",
+};
 
 export default function DuasPage() {
   const { lang } = useLanguage();
   const arabicFont = useArabicFont();
   const [activeCategory, setActiveCategory] = useState("All");
   const [search, setSearch] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
+  const [bookmarkedDuas, setBookmarkedDuas] = useState<Set<string>>(new Set());
+  const [readDuas, setReadDuas] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      const id = data.user?.id || null;
+      setUserId(id);
+      getBookmarks(id).then((bookmarks) => {
+        setBookmarkedDuas(new Set(bookmarks.filter((b) => b.item_type === "dua").map((b) => b.item_id)));
+      });
+    });
+  }, []);
 
   const filtered = useMemo(() => {
     let list: Dua[] = DUAS;
@@ -37,6 +67,41 @@ export default function DuasPage() {
     return d.meaning_en;
   };
 
+  const categoryLabel = (category: string) => t(CATEGORY_KEYS[category] || category, lang);
+
+  const toggleBookmark = async (dua: Dua) => {
+    const id = String(dua.id);
+    if (bookmarkedDuas.has(id)) {
+      await removeBookmark(userId, "dua", id);
+      setBookmarkedDuas((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      return;
+    }
+
+    await addBookmark(userId, {
+      item_type: "dua",
+      item_id: id,
+      title: meaningForLang(dua).slice(0, 80),
+      href: `/duas#dua-${dua.id}`,
+      created_at: new Date().toISOString(),
+    });
+    setBookmarkedDuas((prev) => new Set(prev).add(id));
+  };
+
+  const markRead = async (dua: Dua) => {
+    setReadDuas((prev) => new Set(prev).add(dua.id));
+    await recordLearningEvent({
+      userId,
+      eventType: "dua_read",
+      itemType: "dua",
+      itemId: String(dua.id),
+      metadata: { category: dua.category, title: meaningForLang(dua).slice(0, 80) },
+    });
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       {/* Header */}
@@ -59,7 +124,7 @@ export default function DuasPage() {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search duas..."
+          placeholder={t("duas_search_placeholder", lang)}
           className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
         />
       </div>
@@ -81,7 +146,7 @@ export default function DuasPage() {
                   : "bg-card border border-border text-muted-foreground hover:border-emerald-400 hover:text-emerald-600"
               }`}
             >
-              {cat}
+              {categoryLabel(cat)}
               <span className="ml-1.5 text-xs opacity-70">{count}</span>
             </button>
           );
@@ -90,7 +155,7 @@ export default function DuasPage() {
 
       {/* Dua count */}
       <p className="text-sm text-muted-foreground mb-4">
-        {filtered.length} duas
+        {t("duas_count", lang).replace("{count}", String(filtered.length))}
       </p>
 
       {/* Dua cards */}
@@ -98,16 +163,35 @@ export default function DuasPage() {
         {filtered.map((dua) => (
           <div
             key={dua.id}
+            id={`dua-${dua.id}`}
             className="group rounded-2xl border border-border bg-card p-5 sm:p-6 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-lg transition-all"
           >
             {/* Category + Reference badges */}
             <div className="flex flex-wrap items-center gap-2 mb-4">
               <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
-                {dua.category}
+                {categoryLabel(dua.category)}
               </span>
               <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
                 {dua.reference}
               </span>
+              <button
+                onClick={() => toggleBookmark(dua)}
+                className="ml-auto p-1.5 rounded-lg text-muted-foreground hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
+                title={t("bookmark", lang)}
+              >
+                <Heart className={`h-4 w-4 ${bookmarkedDuas.has(String(dua.id)) ? "fill-pink-500 text-pink-500" : ""}`} />
+              </button>
+              <button
+                onClick={() => markRead(dua)}
+                className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                  readDuas.has(dua.id)
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+                    : "border-border text-muted-foreground hover:bg-accent"
+                }`}
+              >
+                <Check className="h-3 w-3" />
+                {readDuas.has(dua.id) ? t("padha", lang) : t("mark_read", lang)}
+              </button>
             </div>
 
             {/* Arabic */}
@@ -143,7 +227,7 @@ export default function DuasPage() {
         {filtered.length === 0 && (
           <div className="text-center py-16">
             <p className="text-muted-foreground text-lg">
-              No duas found. Try a different search or category.
+              {t("duas_empty", lang)}
             </p>
           </div>
         )}

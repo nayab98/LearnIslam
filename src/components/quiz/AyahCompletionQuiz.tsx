@@ -2,17 +2,21 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { fetchSurahDetail } from "@/lib/quran-api";
+import { ENABLE_LOCALIZED_LANGUAGES } from "@/lib/feature-flags";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { Ayah } from "@/types";
 import { CheckCircle, XCircle, ArrowRight, Trophy, RefreshCw, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { saveGenericQuizAttempt } from "@/lib/user-data";
 
 interface Props {
   difficulty: "easy" | "medium" | "hard";
 }
 
 interface CompletionQuestion {
+  surahId: number;
   surahName: string;
   ayahNumber: number;
   partialText: string;
@@ -42,6 +46,12 @@ export default function AyahCompletionQuiz({ difficulty }: Props) {
   const [loading, setLoading] = useState(true);
   const [finished, setFinished] = useState(false);
   const [results, setResults] = useState<boolean[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
+  }, []);
 
   const loadQuestions = useCallback(async () => {
     setLoading(true);
@@ -55,7 +65,7 @@ export default function AyahCompletionQuiz({ difficulty }: Props) {
     const allIds = Array.from({ length: max - min + 1 }, (_, i) => min + i);
     const surahIds = shuffle(allIds).slice(0, 3);
 
-    const pool: { ayah: Ayah; surahName: string; ayahNum: number }[] = [];
+    const pool: { ayah: Ayah; surahId: number; surahName: string; ayahNum: number }[] = [];
     const allWords: string[] = [];
 
     for (const sid of surahIds) {
@@ -64,7 +74,11 @@ export default function AyahCompletionQuiz({ difficulty }: Props) {
         for (const ayah of ayahs) {
           const words = ayah.text.trim().split(/\s+/);
           if (words.length >= 4) {
-            pool.push({ ayah, surahName: surah.hindiName, ayahNum: ayah.numberInSurah });
+            const surahName =
+              ENABLE_LOCALIZED_LANGUAGES && (lang === "hi" || lang === "hinglish")
+                ? surah.hindiName
+                : surah.englishName;
+            pool.push({ ayah, surahId: sid, surahName, ayahNum: ayah.numberInSurah });
             allWords.push(...words);
           }
         }
@@ -105,6 +119,7 @@ export default function AyahCompletionQuiz({ difficulty }: Props) {
 
       const options = shuffle([missingWords, ...distractors]);
       qs.push({
+        surahId: item.surahId,
         surahName: item.surahName,
         ayahNumber: item.ayahNum,
         partialText,
@@ -116,19 +131,30 @@ export default function AyahCompletionQuiz({ difficulty }: Props) {
 
     setQuestions(qs);
     setLoading(false);
-  }, [difficulty]);
+  }, [difficulty, lang]);
 
   useEffect(() => {
     loadQuestions();
   }, [loadQuestions]);
 
-  const handleSelect = (optionIdx: number) => {
+  const handleSelect = async (optionIdx: number) => {
     if (selected !== null) return;
     setSelected(optionIdx);
 
     const isCorrect = optionIdx === questions[currentIdx].correctIdx;
     if (isCorrect) setScore((s) => s + 1);
     setResults((r) => [...r, isCorrect]);
+    if (userId) {
+      const q = questions[currentIdx];
+      await saveGenericQuizAttempt(
+        userId,
+        "ayah-completion",
+        `${q.surahId}:${q.ayahNumber}`,
+        isCorrect,
+        difficulty,
+        `${q.surahName} ${q.ayahNumber}`
+      );
+    }
   };
 
   const handleNext = () => {

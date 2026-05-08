@@ -6,8 +6,11 @@ import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { CheckCircle, XCircle, ArrowRight, Trophy, RefreshCw, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { saveGenericQuizAttempt } from "@/lib/user-data";
 
 interface QuizQuestion {
+  id: number;
   arabicText: string;
   promptText: string;
   correctCompletion: string;
@@ -49,6 +52,12 @@ export default function HadithQuiz({ difficulty }: Props) {
   const [loading, setLoading] = useState(true);
   const [finished, setFinished] = useState(false);
   const [results, setResults] = useState<boolean[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
+  }, []);
 
   const loadQuestions = useCallback(() => {
     setLoading(true);
@@ -79,6 +88,7 @@ export default function HadithQuiz({ difficulty }: Props) {
       if (distractors.length < 3) continue;
 
       qs.push({
+        id: hadith.id,
         arabicText: hadith.arabic_text,
         promptText: firstHalf,
         correctCompletion: secondHalf,
@@ -97,13 +107,24 @@ export default function HadithQuiz({ difficulty }: Props) {
     loadQuestions();
   }, [loadQuestions]);
 
-  const handleSelect = (option: string) => {
+  const handleSelect = async (option: string) => {
     if (selected) return;
     setSelected(option);
 
     const isCorrect = option === questions[currentIdx].correctCompletion;
     if (isCorrect) setScore((s) => s + 1);
     setResults((r) => [...r, isCorrect]);
+    if (userId) {
+      const q = questions[currentIdx];
+      await saveGenericQuizAttempt(
+        userId,
+        "hadith",
+        String(q.id),
+        isCorrect,
+        difficulty,
+        `${COLLECTION_LABELS[q.collection] || q.collection} #${q.hadithNumber}`
+      );
+    }
   };
 
   const handleNext = () => {
@@ -155,7 +176,7 @@ export default function HadithQuiz({ difficulty }: Props) {
           </div>
           <h2 className="text-3xl font-bold mb-2">{t("quiz_done", lang)}</h2>
           <p className="text-muted-foreground mb-8">
-            {t("quiz_completed", lang)} — Hadith Quiz ({diffLabel})
+            {t("quiz_completed", lang)} — {t("quiz_type_hadith", lang)} ({diffLabel})
           </p>
 
           <div className="flex items-center justify-center gap-2 mb-4">
@@ -226,7 +247,7 @@ export default function HadithQuiz({ difficulty }: Props) {
             >
               {diffLabel}
             </span>
-            <span className="text-sm text-muted-foreground">Hadith Quiz</span>
+            <span className="text-sm text-muted-foreground">{t("quiz_type_hadith", lang)}</span>
           </div>
           <p className="text-sm font-medium">
             {t("sawaal", lang)} {currentIdx + 1} / {questions.length}

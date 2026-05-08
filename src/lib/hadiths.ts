@@ -114,7 +114,7 @@ export const CURATED_HADITHS: Hadith[] = [
   {
     id: 10,
     arabic_text: "الطُّهُورُ شَطْرُ الْإِيمَانِ",
-    english_text: "Cleanliness is half of faith.",
+    english_text: "Purity is half of faith.",
     narrator_en: "Abu Malik Al-Ashari",
     collection: "muslim",
     hadith_number: 223,
@@ -356,7 +356,7 @@ export const CURATED_HADITHS: Hadith[] = [
   {
     id: 32,
     arabic_text: "الْمُسْلِمُ أَخُو الْمُسْلِمِ لَا يَظْلِمُهُ وَلَا يُسْلِمُهُ",
-    english_text: "A Muslim is the brother of another Muslim. He does not wrong him nor abandon him.",
+    english_text: "A Muslim is the brother of another Muslim. He does not wrong him or hand him over to harm.",
     narrator_en: "Abdullah ibn Umar",
     collection: "bukhari",
     hadith_number: 2442,

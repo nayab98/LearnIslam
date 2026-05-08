@@ -33,7 +33,7 @@ export default function WordByWordAyah({ surahNumber, ayahNumber, arabicText }: 
 
   if (loading) {
     return (
-      <p className={`text-right text-3xl ${arabicFont} leading-[2.2] text-foreground animate-pulse`}>
+      <p className={`quran-arabic text-right text-[2.25rem] sm:text-[2.75rem] md:text-[3rem] ${arabicFont} leading-[2.55] text-foreground animate-pulse`} dir="rtl">
         {arabicText}
       </p>
     );
@@ -41,14 +41,14 @@ export default function WordByWordAyah({ surahNumber, ayahNumber, arabicText }: 
 
   if (!words || words.length === 0) {
     return (
-      <p className={`text-right text-3xl ${arabicFont} leading-[2.2] text-foreground`}>
+      <p className={`quran-arabic text-right text-[2.25rem] sm:text-[2.75rem] md:text-[3rem] ${arabicFont} leading-[2.55] text-foreground`} dir="rtl">
         {arabicText}
       </p>
     );
   }
 
   return (
-    <div className="flex flex-wrap-reverse gap-x-2 gap-y-4 justify-end">
+    <div className="flex flex-wrap-reverse gap-x-3 gap-y-5 justify-end quran-arabic" dir="rtl">
       {words
         .filter((w) => w.char_type !== "end")
         .map((word, idx) => (
@@ -64,7 +64,7 @@ export default function WordByWordAyah({ surahNumber, ayahNumber, arabicText }: 
                   : "hover:bg-accent"
               }`}
             >
-              <span className={`text-2xl ${arabicFont} leading-relaxed`}>{word.text}</span>
+              <span className={`text-3xl ${arabicFont} leading-relaxed`}>{word.text}</span>
               {word.transliteration?.text && (
                 <span className="text-[10px] text-muted-foreground italic">
                   {word.transliteration.text}

@@ -46,11 +46,76 @@ create table public.streaks (
   updated_at timestamp with time zone default timezone('utc', now())
 );
 
+-- Learning events: append-only activity log used to power daily plans, badges, and review
+create table if not exists public.learning_events (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  event_type text not null,
+  item_type text not null,
+  item_id text not null,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamp with time zone default timezone('utc', now())
+);
+
+-- Cloud-backed bookmarks. Guests still use localStorage until login.
+create table if not exists public.user_bookmarks (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  item_type text not null,
+  item_id text not null,
+  title text not null,
+  href text,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamp with time zone default timezone('utc', now()),
+  unique(user_id, item_type, item_id)
+);
+
+-- Private user notes replacing local-only comments for authenticated users.
+create table if not exists public.user_notes (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  item_type text not null,
+  item_id text not null,
+  text text not null,
+  created_at timestamp with time zone default timezone('utc', now()),
+  updated_at timestamp with time zone default timezone('utc', now())
+);
+
+-- Persisted earned badges.
+create table if not exists public.user_earned_badges (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  badge_id text not null,
+  earned_at timestamp with time zone default timezone('utc', now()),
+  unique(user_id, badge_id)
+);
+
+-- Spaced review queue for ayahs, words, hadiths, duas, and quiz misses.
+create table if not exists public.review_items (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  item_type text not null,
+  item_id text not null,
+  title text,
+  next_due_at timestamp with time zone default timezone('utc', now()),
+  interval_days integer default 1,
+  ease numeric default 2.5,
+  last_result text check (last_result in ('again', 'hard', 'good', 'easy')),
+  metadata jsonb default '{}'::jsonb,
+  updated_at timestamp with time zone default timezone('utc', now()),
+  unique(user_id, item_type, item_id)
+);
+
 -- Row Level Security
 alter table public.profiles enable row level security;
 alter table public.progress enable row level security;
 alter table public.quiz_attempts enable row level security;
 alter table public.streaks enable row level security;
+alter table public.learning_events enable row level security;
+alter table public.user_bookmarks enable row level security;
+alter table public.user_notes enable row level security;
+alter table public.user_earned_badges enable row level security;
+alter table public.review_items enable row level security;
 
 -- Profiles policies
 create policy "Users can view their own profile" on public.profiles for select using (auth.uid() = id);
@@ -69,6 +134,32 @@ create policy "Users can insert their own attempts" on public.quiz_attempts for 
 -- Streaks policies
 create policy "Users can view their own streak" on public.streaks for select using (auth.uid() = user_id);
 create policy "Users can upsert their own streak" on public.streaks for all using (auth.uid() = user_id);
+
+-- Learning event policies
+create policy "Users can view their own learning events" on public.learning_events for select using (auth.uid() = user_id);
+create policy "Users can insert their own learning events" on public.learning_events for insert with check (auth.uid() = user_id);
+
+-- Bookmark policies
+create policy "Users can view their own bookmarks" on public.user_bookmarks for select using (auth.uid() = user_id);
+create policy "Users can insert their own bookmarks" on public.user_bookmarks for insert with check (auth.uid() = user_id);
+create policy "Users can update their own bookmarks" on public.user_bookmarks for update using (auth.uid() = user_id);
+create policy "Users can delete their own bookmarks" on public.user_bookmarks for delete using (auth.uid() = user_id);
+
+-- Notes policies
+create policy "Users can view their own notes" on public.user_notes for select using (auth.uid() = user_id);
+create policy "Users can insert their own notes" on public.user_notes for insert with check (auth.uid() = user_id);
+create policy "Users can update their own notes" on public.user_notes for update using (auth.uid() = user_id);
+create policy "Users can delete their own notes" on public.user_notes for delete using (auth.uid() = user_id);
+
+-- Badge policies
+create policy "Users can view their own badges" on public.user_earned_badges for select using (auth.uid() = user_id);
+create policy "Users can insert their own badges" on public.user_earned_badges for insert with check (auth.uid() = user_id);
+
+-- Review item policies
+create policy "Users can view their own review items" on public.review_items for select using (auth.uid() = user_id);
+create policy "Users can insert their own review items" on public.review_items for insert with check (auth.uid() = user_id);
+create policy "Users can update their own review items" on public.review_items for update using (auth.uid() = user_id);
+create policy "Users can delete their own review items" on public.review_items for delete using (auth.uid() = user_id);
 
 -- Auto-create profile on sign up
 create or replace function public.handle_new_user()

@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { Heart, X, BookOpen, BookMarked } from "lucide-react";
+import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
-import { getLocalBookmarks, removeLocalBookmark, Bookmark } from "@/lib/bookmarks";
+import { getBookmarkHref, getBookmarks, removeBookmark, Bookmark } from "@/lib/bookmarks";
+import { createClient } from "@/lib/supabase/client";
 
 type TabType = "ayah" | "hadith" | "dua";
 
@@ -12,14 +14,20 @@ export default function BookmarksPage() {
   const { lang } = useLanguage();
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [activeTab, setActiveTab] = useState<TabType>("ayah");
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    setBookmarks(getLocalBookmarks());
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      const id = data.user?.id || null;
+      setUserId(id);
+      getBookmarks(id).then(setBookmarks);
+    });
   }, []);
 
-  const handleRemove = (item_type: string, item_id: string) => {
-    removeLocalBookmark(item_type, item_id);
-    setBookmarks(getLocalBookmarks());
+  const handleRemove = async (item_type: string, item_id: string) => {
+    await removeBookmark(userId, item_type, item_id);
+    setBookmarks(await getBookmarks(userId));
   };
 
   const grouped: Record<TabType, Bookmark[]> = {
@@ -86,7 +94,10 @@ export default function BookmarksPage() {
                 key={`${bm.item_type}-${bm.item_id}`}
                 className="flex items-start justify-between gap-4 p-4 bg-card border border-border rounded-2xl group hover:border-emerald-200 dark:hover:border-emerald-800 transition-colors"
               >
-                <div className="flex items-start gap-3 min-w-0">
+                <Link
+                  href={bm.href || getBookmarkHref(bm.item_type, bm.item_id)}
+                  className="flex items-start gap-3 min-w-0 flex-1"
+                >
                   <BookOpen className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">
@@ -96,7 +107,7 @@ export default function BookmarksPage() {
                       {bm.item_id}
                     </p>
                   </div>
-                </div>
+                </Link>
                 <button
                   onClick={() => handleRemove(bm.item_type, bm.item_id)}
                   className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"

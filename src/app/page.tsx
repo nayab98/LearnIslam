@@ -203,51 +203,89 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Daily Verse + Hadith */}
+      {/* Daily Verse + Hadith + Quick Links */}
       <section className="py-16 bg-background">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-10">
             {t("daily_section_title", lang)}
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Today's Verse */}
-            <div className="rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 p-6 sm:p-8 text-white shadow-lg">
-              <h3 className="text-sm font-semibold uppercase tracking-wider opacity-80 mb-4">
-                📖 {t("daily_verse_title", lang)}
-              </h3>
-              {verseLoading ? (
-                <p className="text-white/70 text-sm">{t("daily_loading", lang)}</p>
-              ) : verse ? (
-                <>
-                  <p className={`text-2xl sm:text-3xl ${arabicFont} leading-loose mb-4 text-right`}>
-                    {verse.arabic}
-                  </p>
-                  <p className="text-sm sm:text-base opacity-90 leading-relaxed mb-3">
-                    &ldquo;{verse.translation}&rdquo;
-                  </p>
-                  <p className="text-xs opacity-60">
-                    — {verse.surahName}, Ayah {verse.ayahNumber}
-                  </p>
-                </>
-              ) : (
-                <p className="text-white/70 text-sm">Could not load verse.</p>
-              )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Daily Verse + Hadith — take up 2 columns */}
+            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Today's Verse */}
+              <div className="rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 p-6 sm:p-8 text-white shadow-lg">
+                <h3 className="text-sm font-semibold uppercase tracking-wider opacity-80 mb-4">
+                  📖 {t("daily_verse_title", lang)}
+                </h3>
+                {verseLoading ? (
+                  <p className="text-white/70 text-sm">{t("daily_loading", lang)}</p>
+                ) : verse ? (
+                  <>
+                    <p className={`text-2xl sm:text-3xl ${arabicFont} leading-loose mb-4 text-right`}>
+                      {verse.arabic}
+                    </p>
+                    <p className="text-sm sm:text-base opacity-90 leading-relaxed mb-3">
+                      &ldquo;{verse.translation}&rdquo;
+                    </p>
+                    <p className="text-xs opacity-60">
+                      — {verse.surahName}, Ayah {verse.ayahNumber}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-white/70 text-sm">{t("daily_verse_error", lang)}</p>
+                )}
+              </div>
+
+              {/* Today's Hadith */}
+              <div className="rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 p-6 sm:p-8 text-white shadow-lg">
+                <h3 className="text-sm font-semibold uppercase tracking-wider opacity-80 mb-4">
+                  📜 {t("daily_hadith_title", lang)}
+                </h3>
+                <p className={`text-2xl sm:text-3xl ${arabicFont} leading-loose mb-4 text-right`}>
+                  {dailyHadith.arabic_text}
+                </p>
+                <p className="text-sm sm:text-base opacity-90 leading-relaxed mb-3">
+                  &ldquo;{dailyHadith.english_text}&rdquo;
+                </p>
+                <p className="text-xs opacity-60">
+                  — {dailyHadith.narrator_en} | {dailyHadith.collection.charAt(0).toUpperCase() + dailyHadith.collection.slice(1)} #{dailyHadith.hadith_number}
+                </p>
+              </div>
             </div>
 
-            {/* Today's Hadith */}
-            <div className="rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 p-6 sm:p-8 text-white shadow-lg">
-              <h3 className="text-sm font-semibold uppercase tracking-wider opacity-80 mb-4">
-                📜 {t("daily_hadith_title", lang)}
+            {/* Quick Links */}
+            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+                ⚡ {t("quick_links", lang)}
               </h3>
-              <p className={`text-2xl sm:text-3xl ${arabicFont} leading-loose mb-4 text-right`}>
-                {dailyHadith.arabic_text}
-              </p>
-              <p className="text-sm sm:text-base opacity-90 leading-relaxed mb-3">
-                &ldquo;{dailyHadith.english_text}&rdquo;
-              </p>
-              <p className="text-xs opacity-60">
-                — {dailyHadith.narrator_en} | {dailyHadith.collection.charAt(0).toUpperCase() + dailyHadith.collection.slice(1)} #{dailyHadith.hadith_number}
-              </p>
+              <div className="flex flex-col gap-2">
+                {[
+                  { number: 36, arabic: "يٰسٓ", name: "Ya-Sin" },
+                  { number: 56, arabic: "الواقعة", name: "Al-Waqi'ah" },
+                  { number: 67, arabic: "الملك", name: "Al-Mulk" },
+                  { number: 55, arabic: "الرحمن", name: "Ar-Rahman" },
+                  { number: 62, arabic: "الجمعة", name: "Al-Jumu'ah" },
+                  { number: 18, arabic: "الكهف", name: "Al-Kahf" },
+                ].map((surah) => (
+                  <Link
+                    key={surah.number}
+                    href={`/surahs/${surah.number}`}
+                    className="flex items-center justify-between px-4 py-3 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-7 h-7 flex items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
+                        {surah.number}
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold leading-tight">{surah.name}</p>
+                      </div>
+                    </div>
+                    <span className={`text-lg ${arabicFont} text-muted-foreground group-hover:text-emerald-600 dark:group-hover:text-emerald-400`}>
+                      {surah.arabic}
+                    </span>
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -326,7 +364,7 @@ export default function HomePage() {
       <section className="py-24 bg-background">
         <div className="max-w-3xl mx-auto px-4 text-center">
           <div className="bg-gradient-to-br from-emerald-600 to-teal-600 rounded-3xl p-12 text-white">
-            <p className="text-5xl font-arabic leading-relaxed mb-6">
+            <p className={`text-5xl ${arabicFont} leading-relaxed mb-6`}>
               وَنُنَزِّلُ مِنَ الْقُرْآنِ مَا هُوَ شِفَاءٌ وَرَحْمَةٌ
             </p>
             <p className="text-xl font-medium mb-2 opacity-90">

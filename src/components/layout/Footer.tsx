@@ -22,7 +22,7 @@ export default function Footer() {
             <Link href="/dashboard" className="hover:text-foreground transition-colors">{t("nav_progress", lang)}</Link>
           </div>
           <p className="text-xs text-muted-foreground text-center">
-            قرآن مجید — قرآن مجید کی ترجمانی
+            {t("footer_note", lang)}
           </p>
         </div>
       </div>

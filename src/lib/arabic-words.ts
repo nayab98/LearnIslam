@@ -159,7 +159,7 @@ const HARD_WORDS: ArabicWord[] = [
   { arabic: "حَافِظ", transliteration: "Haafidh", meaning_hi: "हाफ़िज़ (याद करने वाला)", meaning_hinglish: "Haafiz (Yaad karne wala)", meaning_en: "Memorizer" },
   { arabic: "قَارِئ", transliteration: "Qaari", meaning_hi: "क़ारी (पढ़ने वाला)", meaning_hinglish: "Qaari (Padhne wala)", meaning_en: "Reciter" },
   { arabic: "عَالِم", transliteration: "Aalim", meaning_hi: "आलिम (विद्वान)", meaning_hinglish: "Aalim (Vidwaan)", meaning_en: "Scholar" },
-  { arabic: "مُجْتَهِد", transliteration: "Mujtahid", meaning_hi: "मुज्तहिद (प्रयत्नशील विद्वान)", meaning_hinglish: "Mujtahid (Prayatnasheel Vidwaan)", meaning_en: "Scholar of effort" },
+  { arabic: "مُجْتَهِد", transliteration: "Mujtahid", meaning_hi: "मुज्तहिद (योग्य इस्लामी विद्वान)", meaning_hinglish: "Mujtahid (Yogya Islami vidwaan)", meaning_en: "Qualified scholar of ijtihad" },
   { arabic: "فَتْوَى", transliteration: "Fatwa", meaning_hi: "फ़तवा (धार्मिक निर्णय)", meaning_hinglish: "Fatwa (Dharmik Nirnay)", meaning_en: "Religious ruling" },
   { arabic: "إِجْمَاع", transliteration: "Ijmaa", meaning_hi: "इज्मा (सर्वसम्मति)", meaning_hinglish: "Ijmaa (Sarvasammati)", meaning_en: "Consensus" },
   { arabic: "قِيَاس", transliteration: "Qiyaas", meaning_hi: "क़ियास (अनुमान)", meaning_hinglish: "Qiyaas (Anumaan)", meaning_en: "Analogical reasoning" },

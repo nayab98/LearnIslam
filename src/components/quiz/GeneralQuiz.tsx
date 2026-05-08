@@ -6,6 +6,8 @@ import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { CheckCircle, XCircle, ArrowRight, Trophy, RefreshCw, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { saveGenericQuizAttempt } from "@/lib/user-data";
 
 interface Props {
   difficulty: "easy" | "medium" | "hard";
@@ -26,6 +28,12 @@ export default function GeneralQuiz({ difficulty }: Props) {
   const [loading, setLoading] = useState(true);
   const [finished, setFinished] = useState(false);
   const [results, setResults] = useState<boolean[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
+  }, []);
 
   const loadQuestions = useCallback(() => {
     setLoading(true);
@@ -51,13 +59,24 @@ export default function GeneralQuiz({ difficulty }: Props) {
     return q.question_en;
   };
 
-  const handleSelect = (optionIdx: number) => {
+  const handleSelect = async (optionIdx: number) => {
     if (selected !== null) return;
     setSelected(optionIdx);
 
     const isCorrect = optionIdx === questions[currentIdx].correct;
     if (isCorrect) setScore((s) => s + 1);
     setResults((r) => [...r, isCorrect]);
+    if (userId) {
+      const q = questions[currentIdx];
+      await saveGenericQuizAttempt(
+        userId,
+        "general",
+        `${q.topic}:${getQuestionText(q)}`,
+        isCorrect,
+        difficulty,
+        q.topic
+      );
+    }
   };
 
   const handleNext = () => {

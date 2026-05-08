@@ -6,12 +6,12 @@ import { ArrowLeft, ArrowRight, Zap, Target, Trophy } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 
-const VALID_CATEGORIES: Record<string, { labelEn: string; labelUr: string }> = {
-  hadith: { labelEn: "Hadees Quiz", labelUr: "Hadeeso ka Quiz" },
-  "word-meaning": { labelEn: "Word Meaning", labelUr: "Lafz ke Matlab" },
-  "ayah-completion": { labelEn: "Ayah Completion", labelUr: "Aayat Poori Karein" },
-  "ayah-meaning": { labelEn: "Ayah Meaning", labelUr: "Aayat ka Tarjuma" },
-  general: { labelEn: "General Islamic", labelUr: "Aam Islami Maloomat" },
+const VALID_CATEGORIES: Record<string, { labelKey: string }> = {
+  hadith: { labelKey: "quiz_cat_hadith" },
+  "word-meaning": { labelKey: "quiz_cat_word" },
+  "ayah-completion": { labelKey: "quiz_cat_ayah_comp" },
+  "ayah-meaning": { labelKey: "quiz_cat_ayah_mean" },
+  general: { labelKey: "quiz_cat_general" },
 };
 
 const difficultyConfigs = [
@@ -66,16 +66,16 @@ export default function CategoryDifficultyPage() {
   if (!categoryInfo) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <h2 className="text-2xl font-bold mb-2">Page Not Found</h2>
-        <p className="text-muted-foreground">Invalid quiz category.</p>
+        <h2 className="text-2xl font-bold mb-2">{t("error_not_found_title", lang)}</h2>
+        <p className="text-muted-foreground">{t("invalid_quiz_category", lang)}</p>
         <Link href="/quiz" className="text-primary underline mt-4 inline-block">
-          Back to Quiz
+          {t("back_to_quiz", lang)}
         </Link>
       </div>
     );
   }
 
-  const categoryLabel = lang === "hi" ? categoryInfo.labelUr : categoryInfo.labelEn;
+  const categoryLabel = t(categoryInfo.labelKey, lang);
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -92,7 +92,7 @@ export default function CategoryDifficultyPage() {
       <div className="mb-10">
         <h1 className="text-3xl font-bold mb-2">{categoryLabel}</h1>
         <p className="text-muted-foreground text-lg">
-          {lang === "hi" ? "Mushkilat ka darjah chunein" : "Choose your difficulty level"}
+          {t("choose_difficulty", lang)}
         </p>
       </div>
 
@@ -111,9 +111,6 @@ export default function CategoryDifficultyPage() {
               </div>
               <div className="flex items-center gap-2 mb-2">
                 <h3 className="text-xl font-bold">{t(diff.labelKey, lang)}</h3>
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/60 dark:bg-black/20 text-muted-foreground">
-                  {diff.englishLabel}
-                </span>
               </div>
               <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
                 {t(diff.descKey, lang)}

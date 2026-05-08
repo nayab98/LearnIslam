@@ -1,9 +1,11 @@
-/* Arabic fonts — must be before other imports */
-@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap');
+/* Arabic fonts — Al Qalam Quran Majeed primary, Amiri as complete fallback */
+@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&display=swap');
 
 @font-face {
-  font-family: 'South Asian Script';
-  src: url('/fonts/UthmanicHafs.woff2') format('woff2');
+  font-family: 'Al Qalam Quran Majeed';
+  src: url('/fonts/AlQalamQuranMajeed.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
   font-display: swap;
 }
 
@@ -12,7 +14,7 @@
 
 @theme inline {
   --font-sans: var(--font-inter);
-  --font-arabic: "Noto Naskh Arabic", "Amiri", "Traditional Arabic", serif;
+  --font-arabic: "Al Qalam Quran Majeed", "Amiri", "Traditional Arabic", serif;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -96,11 +98,72 @@
     text-wrap: balance;
   }
   .font-arabic {
-    font-family: 'South Asian Script', 'Traditional Arabic', serif;
+    font-family: 'Al Qalam Quran Majeed', 'Amiri', 'Traditional Arabic', serif;
     direction: rtl;
   }
-  .font-arabic-naskh {
-    font-family: 'Noto Naskh Arabic', 'Amiri', 'Traditional Arabic', serif;
+
+  .quran-arabic {
+    font-family: 'Al Qalam Quran Majeed', 'Amiri', 'Traditional Arabic', serif;
     direction: rtl;
+    font-weight: 400;
+    font-synthesis: none;
+    letter-spacing: 0;
+    word-spacing: 0.16em;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  }
+
+  .mushaf-page {
+    background:
+      linear-gradient(180deg, color-mix(in oklch, var(--card) 92%, #fff8dc 8%), var(--card));
+  }
+
+  .tajweed-madd {
+    color: oklch(0.55 0.19 35);
+  }
+
+  .tajweed-ghunnah {
+    color: oklch(0.48 0.16 150);
+  }
+
+  .tajweed-qalqalah {
+    color: oklch(0.52 0.16 250);
+  }
+
+  .tajweed-ikhfa {
+    color: oklch(0.5 0.13 190);
+  }
+
+  .tajweed-tafkheem {
+    color: oklch(0.45 0.12 260);
+  }
+
+  .tajweed-idgham {
+    color: oklch(0.54 0.18 20);
+  }
+
+  .dark .tajweed-madd {
+    color: oklch(0.75 0.16 45);
+  }
+
+  .dark .tajweed-ghunnah {
+    color: oklch(0.75 0.14 155);
+  }
+
+  .dark .tajweed-qalqalah {
+    color: oklch(0.75 0.13 255);
+  }
+
+  .dark .tajweed-ikhfa {
+    color: oklch(0.75 0.12 195);
+  }
+
+  .dark .tajweed-tafkheem {
+    color: oklch(0.78 0.12 265);
+  }
+
+  .dark .tajweed-idgham {
+    color: oklch(0.76 0.15 25);
   }
 }

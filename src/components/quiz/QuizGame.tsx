@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { fetchSurahDetail } from "@/lib/quran-api";
+import { ENABLE_LOCALIZED_LANGUAGES } from "@/lib/feature-flags";
 import { saveQuizAttempt } from "@/lib/user-data";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/lib/language-context";
@@ -71,7 +72,11 @@ export default function QuizGame({ difficulty, surahRange, label }: Props) {
         const withTranslations = ayahs.filter((a) => a.translation && a.translation.length > 10);
         if (withTranslations.length > 0) {
           const picked = withTranslations[Math.floor(Math.random() * withTranslations.length)];
-          pool.push({ surahId: sid, ayah: picked, surahName: surah.hindiName });
+          const surahName =
+            ENABLE_LOCALIZED_LANGUAGES && (lang === "hi" || lang === "hinglish")
+              ? surah.hindiName
+              : surah.englishName;
+          pool.push({ surahId: sid, ayah: picked, surahName });
         }
       } catch {
         // skip
@@ -102,7 +107,7 @@ export default function QuizGame({ difficulty, surahRange, label }: Props) {
 
     setQuestions(qs);
     setLoading(false);
-  }, [surahRange]);
+  }, [lang, surahRange]);
 
   useEffect(() => {
     loadQuestions();

@@ -6,8 +6,11 @@ import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { CheckCircle, XCircle, ArrowRight, Trophy, RefreshCw, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { saveGenericQuizAttempt } from "@/lib/user-data";
 
 interface QuizQuestion {
+  id: string;
   arabic: string;
   transliteration: string;
   correctMeaning: string;
@@ -40,6 +43,12 @@ export default function WordMeaningQuiz({ difficulty }: Props) {
   const [loading, setLoading] = useState(true);
   const [finished, setFinished] = useState(false);
   const [results, setResults] = useState<boolean[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
+  }, []);
 
   const loadQuestions = useCallback(() => {
     setLoading(true);
@@ -64,6 +73,7 @@ export default function WordMeaningQuiz({ difficulty }: Props) {
       if (distractors.length < 3) continue;
 
       qs.push({
+        id: `${word.arabic}:${word.transliteration}`,
         arabic: word.arabic,
         transliteration: word.transliteration,
         correctMeaning: correct,
@@ -80,13 +90,24 @@ export default function WordMeaningQuiz({ difficulty }: Props) {
     loadQuestions();
   }, [loadQuestions]);
 
-  const handleSelect = (option: string) => {
+  const handleSelect = async (option: string) => {
     if (selected) return;
     setSelected(option);
 
     const isCorrect = option === questions[currentIdx].correctMeaning;
     if (isCorrect) setScore((s) => s + 1);
     setResults((r) => [...r, isCorrect]);
+    if (userId) {
+      const q = questions[currentIdx];
+      await saveGenericQuizAttempt(
+        userId,
+        "word-meaning",
+        q.id,
+        isCorrect,
+        difficulty,
+        `${q.arabic} - ${q.correctMeaningEn}`
+      );
+    }
   };
 
   const handleNext = () => {
@@ -138,7 +159,7 @@ export default function WordMeaningQuiz({ difficulty }: Props) {
           </div>
           <h2 className="text-3xl font-bold mb-2">{t("quiz_done", lang)}</h2>
           <p className="text-muted-foreground mb-8">
-            {t("quiz_completed", lang)} — Word Meaning Quiz ({diffLabel})
+            {t("quiz_completed", lang)} — {t("quiz_type_word_meaning", lang)} ({diffLabel})
           </p>
 
           <div className="flex items-center justify-center gap-2 mb-4">
@@ -209,7 +230,7 @@ export default function WordMeaningQuiz({ difficulty }: Props) {
             >
               {diffLabel}
             </span>
-            <span className="text-sm text-muted-foreground">Word Meaning</span>
+            <span className="text-sm text-muted-foreground">{t("quiz_type_word_meaning", lang)}</span>
           </div>
           <p className="text-sm font-medium">
             {t("sawaal", lang)} {currentIdx + 1} / {questions.length}

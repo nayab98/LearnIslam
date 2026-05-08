@@ -15,11 +15,11 @@ const VALID_CATEGORIES = ["hadith", "word-meaning", "ayah-completion", "ayah-mea
 const VALID_LEVELS = ["easy", "medium", "hard"];
 
 const CATEGORY_LABELS: Record<string, string> = {
-  hadith: "Hadees Quiz",
-  "word-meaning": "Word Meaning",
-  "ayah-completion": "Ayah Completion",
-  "ayah-meaning": "Ayah Meaning",
-  general: "General Islamic",
+  hadith: "quiz_cat_hadith",
+  "word-meaning": "quiz_cat_word",
+  "ayah-completion": "quiz_cat_ayah_comp",
+  "ayah-meaning": "quiz_cat_ayah_mean",
+  general: "quiz_cat_general",
 };
 
 const DIFFICULTY_MAP: Record<string, { labelKey: string; surahRange: [number, number] }> = {
@@ -37,16 +37,16 @@ export default function QuizLevelPage() {
   if (!VALID_CATEGORIES.includes(category) || !VALID_LEVELS.includes(level)) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <h2 className="text-2xl font-bold mb-2">Page Not Found</h2>
-        <p className="text-muted-foreground">Invalid quiz category or difficulty level.</p>
-        <Link href="/quiz" className="text-emerald-600 underline mt-4 inline-block">Back to Quiz</Link>
+        <h2 className="text-2xl font-bold mb-2">{t("error_not_found_title", lang)}</h2>
+        <p className="text-muted-foreground">{t("invalid_quiz_level", lang)}</p>
+        <Link href="/quiz" className="text-emerald-600 underline mt-4 inline-block">{t("back_to_quiz", lang)}</Link>
       </div>
     );
   }
 
   const difficulty = level as "easy" | "medium" | "hard";
   const diffConfig = DIFFICULTY_MAP[level];
-  const categoryLabel = CATEGORY_LABELS[category];
+  const categoryLabel = t(CATEGORY_LABELS[category], lang);
 
   function renderQuiz() {
     switch (category) {

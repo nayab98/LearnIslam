@@ -6,25 +6,29 @@ import {
   getUserProfile,
   getUserStreak,
   getQuizStats,
-  getReadSurahIds,
+  getReadingStats,
 } from "@/lib/user-data";
-import { UserProfile, UserStreak } from "@/types";
-import { Flame, Trophy, BookOpen, Target, Zap, LogIn, Lock, Award } from "lucide-react";
+import { UserProfile, UserStreak, LastReadPosition, ReadingStats, ReviewItem } from "@/types";
+import { Flame, Trophy, BookOpen, Target, Zap, LogIn, Lock, Award, ListChecks, RotateCcw, BookmarkCheck } from "lucide-react";
 import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { HijriCalendar } from "@/components/layout/HijriCalendar";
-import { BADGES, getEarnedBadges } from "@/lib/badges";
+import { BADGES } from "@/lib/badges";
+import { getDueReviewItems, getEarnedBadgeIds, getLastReadPosition, getTodayEventCounts } from "@/lib/learning-events";
 
 interface Stats {
   profile: UserProfile | null;
   streak: UserStreak | null;
   quiz: { total: number; correct: number; accuracy: number };
-  readSurahs: number[];
+  reading: ReadingStats;
+  today: Awaited<ReturnType<typeof getTodayEventCounts>>;
+  lastRead: LastReadPosition | null;
+  dueReview: ReviewItem[];
 }
 
-function XPBar({ xp, level }: { xp: number; level: number }) {
+function XPBar({ xp, level, lang }: { xp: number; level: number; lang: "hi" | "hinglish" | "en" }) {
   const xpForCurrentLevel = (level - 1) * 500;
   const xpForNextLevel = level * 500;
   const progress = ((xp - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)) * 100;
@@ -36,7 +40,7 @@ function XPBar({ xp, level }: { xp: number; level: number }) {
       </div>
       <div className="flex-1">
         <div className="flex justify-between text-xs text-muted-foreground mb-1">
-          <span>Level {level}</span>
+          <span>{t("level_label", lang)} {level}</span>
           <span>{xp} / {xpForNextLevel} XP</span>
         </div>
         <Progress value={Math.min(progress, 100)} className="h-2" />
@@ -53,28 +57,30 @@ export default function DashboardPage() {
   const { lang } = useLanguage();
 
   useEffect(() => {
-    setEarnedBadgeIds(getEarnedBadges());
-  }, []);
-
-  useEffect(() => {
     const supabase = createClient();
 
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) {
         setIsLoggedIn(false);
+        setEarnedBadgeIds(await getEarnedBadgeIds(null));
         setLoading(false);
         return;
       }
       setIsLoggedIn(true);
 
-      const [profile, streak, quiz, readSurahs] = await Promise.all([
+      const [profile, streak, quiz, reading, today, lastRead, dueReview, badgeIds] = await Promise.all([
         getUserProfile(data.user.id),
         getUserStreak(data.user.id),
         getQuizStats(data.user.id),
-        getReadSurahIds(data.user.id),
+        getReadingStats(data.user.id),
+        getTodayEventCounts(data.user.id),
+        getLastReadPosition(data.user.id),
+        getDueReviewItems(data.user.id, 5),
+        getEarnedBadgeIds(data.user.id),
       ]);
 
-      setStats({ profile, streak, quiz, readSurahs });
+      setStats({ profile, streak, quiz, reading, today, lastRead, dueReview });
+      setEarnedBadgeIds(badgeIds);
       setLoading(false);
     });
   }, []);
@@ -97,9 +103,59 @@ export default function DashboardPage() {
   const profile = stats?.profile ?? null;
   const streak = stats?.streak ?? null;
   const quiz = stats?.quiz ?? { total: 0, correct: 0, accuracy: 0 };
-  const readSurahs = stats?.readSurahs ?? [];
-  const totalSurahs = 114;
-  const surahProgress = Math.round((readSurahs.length / totalSurahs) * 100);
+  const reading = stats?.reading ?? {
+    readAyahs: 0,
+    memorizedAyahs: 0,
+    touchedSurahs: 0,
+    completedSurahs: 0,
+    totalAyahs: 6236,
+  };
+  const ayahProgress = Math.round((reading.readAyahs / reading.totalAyahs) * 100);
+  const today = stats?.today ?? {
+    ayah_read: 0,
+    word_reviewed: 0,
+    dua_read: 0,
+    hadith_read: 0,
+    quiz_answered: 0,
+  };
+  const dailyPlan = [
+    {
+      title: t("daily_read_ayahs", lang),
+      desc: t("daily_read_ayahs_desc", lang),
+      href: stats?.lastRead ? `/surahs/${stats.lastRead.surah_id}#ayah-${stats.lastRead.ayah_id}` : "/surahs/1",
+      progress: Math.min(today.ayah_read, 5),
+      target: 5,
+    },
+    {
+      title: t("daily_review_words", lang),
+      desc: t("daily_review_words_desc", lang),
+      href: "/lafz-ba-lafz/easy",
+      progress: Math.min(today.word_reviewed, 5),
+      target: 5,
+    },
+    {
+      title: t("daily_hadith_task", lang),
+      desc: t("daily_hadith_task_desc", lang),
+      href: "/hadees/easy",
+      progress: Math.min(today.hadith_read, 1),
+      target: 1,
+    },
+    {
+      title: t("daily_dua_task", lang),
+      desc: t("daily_dua_task_desc", lang),
+      href: "/duas",
+      progress: Math.min(today.dua_read, 1),
+      target: 1,
+    },
+    {
+      title: t("daily_quiz_task", lang),
+      desc: t("daily_quiz_task_desc", lang),
+      href: "/quiz",
+      progress: Math.min(today.quiz_answered, 1),
+      target: 1,
+    },
+  ];
+  const completedDailyTasks = dailyPlan.filter((task) => task.progress >= task.target).length;
 
   const statCards = [
     {
@@ -113,8 +169,8 @@ export default function DashboardPage() {
     {
       icon: BookOpen,
       label: t("nav_surahs", lang),
-      value: `${readSurahs.length}`,
-      sub: `/ 114 ${t("padhi", lang)}`,
+      value: `${reading.completedSurahs}`,
+      sub: `/ 114 ${t("completed", lang)}`,
       color: "text-emerald-600",
       bg: "bg-emerald-50 dark:bg-emerald-950/30",
     },
@@ -152,7 +208,9 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-1">
-          {profile?.name ? `${profile.name} ka Dashboard` : t("dashboard_title", lang)}
+          {profile?.name
+            ? t("dashboard_named", lang).replace("{name}", profile.name)
+            : t("dashboard_title", lang)}
         </h1>
         <p className="text-muted-foreground">{t("dashboard_subtitle", lang)}</p>
       </div>
@@ -167,7 +225,7 @@ export default function DashboardPage() {
             </div>
             <span className="text-sm text-muted-foreground">{profile.xp} XP</span>
           </div>
-          <XPBar xp={profile.xp} level={profile.level} />
+          <XPBar xp={profile.xp} level={profile.level} lang={lang} />
         </div>
       )}
 
@@ -188,15 +246,79 @@ export default function DashboardPage() {
         })}
       </div>
 
+      {/* Daily plan */}
+      <div className="bg-card border border-border rounded-2xl p-6 mb-6">
+        <div className="flex items-center justify-between gap-4 mb-5">
+          <div className="flex items-center gap-2">
+            <ListChecks className="h-5 w-5 text-emerald-600" />
+            <h3 className="font-semibold">{t("daily_plan", lang)}</h3>
+          </div>
+          <span className="text-sm text-muted-foreground">
+            {completedDailyTasks} / {dailyPlan.length}
+          </span>
+        </div>
+        <div className="space-y-3">
+          {dailyPlan.map((task) => {
+            const done = task.progress >= task.target;
+            return (
+              <Link
+                key={task.title}
+                href={task.href}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 hover:bg-accent transition-colors"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{task.title}</p>
+                  <p className="text-xs text-muted-foreground">{task.desc}</p>
+                </div>
+                <span className={`shrink-0 text-xs font-semibold px-2 py-1 rounded-full ${done ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
+                  {task.progress}/{task.target}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Continue + review */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <Link
+          href={stats?.lastRead ? `/surahs/${stats.lastRead.surah_id}#ayah-${stats.lastRead.ayah_id}` : "/surahs"}
+          className="flex items-center gap-4 p-5 bg-card border border-border hover:border-emerald-400 rounded-2xl transition-colors"
+        >
+          <BookmarkCheck className="h-7 w-7 text-emerald-600" />
+          <div>
+            <div className="font-semibold">{t("continue_reading", lang)}</div>
+            <div className="text-sm text-muted-foreground">
+              {stats?.lastRead
+                ? `${t("surah", lang)} ${stats.lastRead.surah_id}, ${t("ayatein", lang)} ${stats.lastRead.ayah_id}`
+                : t("choose_surah_to_begin", lang)}
+            </div>
+          </div>
+        </Link>
+        <Link
+          href="/quiz"
+          className="flex items-center gap-4 p-5 bg-card border border-border hover:border-purple-400 rounded-2xl transition-colors"
+        >
+          <RotateCcw className="h-7 w-7 text-purple-600" />
+          <div>
+            <div className="font-semibold">{t("review_queue", lang)}</div>
+            <div className="text-sm text-muted-foreground">
+              {stats?.dueReview.length || 0} {t("due_items", lang)}
+            </div>
+          </div>
+        </Link>
+      </div>
+
       {/* Surah progress bar */}
       <div className="bg-card border border-border rounded-2xl p-6 mb-6">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold">{t("surah_progress", lang)}</h3>
-          <span className="text-sm font-medium text-emerald-600">{surahProgress}%</span>
+          <span className="text-sm font-medium text-emerald-600">{ayahProgress}%</span>
         </div>
-        <Progress value={surahProgress} className="h-3 mb-3" />
+        <Progress value={ayahProgress} className="h-3 mb-3" />
         <p className="text-sm text-muted-foreground">
-          {readSurahs.length} {t("nav_surahs", lang)} {t("padhi", lang)} · {totalSurahs - readSurahs.length} {t("baaki", lang)}
+          {reading.readAyahs} / {reading.totalAyahs} {t("ayatein", lang)} {t("padhi", lang)} ·{" "}
+          {reading.completedSurahs} {t("completed_surahs", lang)} · {reading.memorizedAyahs} {t("memorized", lang)}
         </p>
       </div>
 
@@ -218,7 +340,7 @@ export default function DashboardPage() {
         </div>
         {streak?.last_active_date && (
           <p className="text-xs text-muted-foreground mt-3">
-            {t("last_active", lang)} {new Date(streak.last_active_date).toLocaleDateString("en-IN")}
+            {t("last_active", lang)} {new Date(streak.last_active_date).toLocaleDateString(lang === "hi" ? "hi-IN" : "en-IN")}
           </p>
         )}
       </div>
@@ -234,7 +356,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2">
             <Award className="h-5 w-5 text-amber-500" />
             <h3 className="font-semibold">
-              {lang === "hi" ? "बैजेस / उपलब्धियाँ" : lang === "hinglish" ? "Badges / Achievements" : "Badges / Achievements"}
+              {t("badges_title", lang)}
             </h3>
           </div>
           <span className="text-sm text-muted-foreground font-medium">

@@ -37,7 +37,7 @@ export default function Navbar() {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const [user, setUser] = useState<{ email?: string } | null>(null);
-  const { lang, script, setScript } = useLanguage();
+  const { lang } = useLanguage();
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -105,7 +105,7 @@ export default function Navbar() {
                     : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 )}
               >
-                <span className="hidden lg:inline">More</span>
+                <span className="hidden lg:inline">{t("nav_more", lang)}</span>
                 <ChevronDown className={cn("h-4 w-4 transition-transform", moreOpen && "rotate-180")} />
               </button>
               {moreOpen && (
@@ -139,12 +139,6 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-2">
             <ThemeToggle />
             <LanguageSwitcher />
-            <button
-              onClick={() => setScript(script === "naskh" ? "indopak" : "naskh")}
-              className="px-3 py-1.5 rounded-full text-xs font-medium border border-border hover:bg-accent transition-colors font-arabic"
-            >
-              {script === "naskh" ? "Naskh" : "South Asian"}
-            </button>
             {user ? (
               <>
                 <span className="text-sm text-muted-foreground truncate max-w-[140px]">
@@ -192,12 +186,6 @@ export default function Navbar() {
           <div className="pb-2 flex items-center gap-2">
             <ThemeToggle />
             <LanguageSwitcher />
-            <button
-              onClick={() => setScript(script === "naskh" ? "indopak" : "naskh")}
-              className="px-3 py-1.5 rounded-full text-xs font-medium border border-border hover:bg-accent transition-colors font-arabic"
-            >
-              {script === "naskh" ? "Naskh" : "South Asian"}
-            </button>
           </div>
           {allNav.map((item) => {
             const Icon = item.icon;

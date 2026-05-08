@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, useCallback, FormEvent } from "react";
-import { Search, Loader2, BookOpen, BookText, BookHeart } from "lucide-react";
+import { useEffect, useState, useCallback, FormEvent } from "react";
+import Link from "next/link";
+import { Search, Loader2, BookOpen, BookText, BookHeart, Heart, ExternalLink } from "lucide-react";
+import { ENABLE_LOCALIZED_LANGUAGES } from "@/lib/feature-flags";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { useArabicFont } from "@/lib/useArabicFont";
 import { CURATED_HADITHS } from "@/lib/hadiths";
 import { DUAS } from "@/lib/duas";
+import { addBookmark, getBookmarks, removeBookmark } from "@/lib/bookmarks";
+import { createClient } from "@/lib/supabase/client";
 
 interface QuranMatch {
   number: number;
@@ -47,6 +51,19 @@ export default function SearchPage() {
   const [quranResults, setQuranResults] = useState<QuranMatch[]>([]);
   const [hadithResults, setHadithResults] = useState<HadithMatch[]>([]);
   const [duaResults, setDuaResults] = useState<DuaMatch[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [bookmarked, setBookmarked] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      const id = data.user?.id || null;
+      setUserId(id);
+      getBookmarks(id).then((items) => {
+        setBookmarked(new Set(items.map((item) => `${item.item_type}:${item.item_id}`)));
+      });
+    });
+  }, []);
 
   const handleSearch = useCallback(
     async (e: FormEvent) => {
@@ -88,7 +105,7 @@ export default function SearchPage() {
       // Quran search (API)
       try {
         const editions =
-          lang === "hi" ? "hi.farooq" : "en";
+          ENABLE_LOCALIZED_LANGUAGES && lang === "hi" ? "hi.farooq" : "en";
         const res = await fetch(
           `https://api.alquran.cloud/v1/search/${encodeURIComponent(q)}/all/${editions}`
         );
@@ -114,6 +131,30 @@ export default function SearchPage() {
 
   const snippet = (text: string, max = 180) =>
     text.length > max ? text.slice(0, max) + "…" : text;
+
+  const toggleBookmark = async (item: {
+    item_type: "ayah" | "hadith" | "dua";
+    item_id: string;
+    title: string;
+    href: string;
+  }) => {
+    const key = `${item.item_type}:${item.item_id}`;
+    if (bookmarked.has(key)) {
+      await removeBookmark(userId, item.item_type, item.item_id);
+      setBookmarked((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+      return;
+    }
+
+    await addBookmark(userId, {
+      ...item,
+      created_at: new Date().toISOString(),
+    });
+    setBookmarked((prev) => new Set(prev).add(key));
+  };
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -195,7 +236,11 @@ export default function SearchPage() {
                   {quranResults.length === 0 ? (
                     <EmptyState query={query} lang={lang} />
                   ) : (
-                    quranResults.map((m, i) => (
+                    quranResults.map((m, i) => {
+                      const href = `/surahs/${m.surah.number}#ayah-${m.numberInSurah}`;
+                      const itemId = `${m.surah.number}:${m.numberInSurah}`;
+                      const key = `ayah:${itemId}`;
+                      return (
                       <div
                         key={`${m.number}-${i}`}
                         className="rounded-2xl border border-border bg-card p-5 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-lg transition-all"
@@ -207,12 +252,30 @@ export default function SearchPage() {
                           <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
                             {m.surah.number}:{m.numberInSurah}
                           </span>
+                          <button
+                            onClick={() => toggleBookmark({
+                              item_type: "ayah",
+                              item_id: itemId,
+                              title: snippet(m.text, 80),
+                              href,
+                            })}
+                            className="ml-auto p-1.5 rounded-lg text-muted-foreground hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
+                            title="Bookmark"
+                          >
+                            <Heart className={`h-4 w-4 ${bookmarked.has(key) ? "fill-pink-500 text-pink-500" : ""}`} />
+                          </button>
                         </div>
-                        <p className="text-base leading-relaxed text-foreground">
-                          {snippet(m.text)}
-                        </p>
+                        <Link href={href} className="block">
+                          <p className="text-base leading-relaxed text-foreground">
+                            {snippet(m.text)}
+                          </p>
+                          <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 mt-3 font-medium">
+                            {t("open_result", lang)} <ExternalLink className="h-3 w-3" />
+                          </span>
+                        </Link>
                       </div>
-                    ))
+                    );
+                    })
                   )}
                 </>
               )}
@@ -223,7 +286,10 @@ export default function SearchPage() {
                   {hadithResults.length === 0 ? (
                     <EmptyState query={query} lang={lang} />
                   ) : (
-                    hadithResults.map((h) => (
+                    hadithResults.map((h) => {
+                      const href = `/hadees/${h.collection === "bukhari" ? "easy" : "medium"}#hadith-${h.id}`;
+                      const key = `hadith:${h.id}`;
+                      return (
                       <div
                         key={h.id}
                         className="rounded-2xl border border-border bg-card p-5 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-lg transition-all"
@@ -235,19 +301,34 @@ export default function SearchPage() {
                           <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
                             #{h.hadith_number}
                           </span>
+                          <button
+                            onClick={() => toggleBookmark({
+                              item_type: "hadith",
+                              item_id: String(h.id),
+                              title: snippet(h.english_text, 80),
+                              href,
+                            })}
+                            className="ml-auto p-1.5 rounded-lg text-muted-foreground hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
+                            title="Bookmark"
+                          >
+                            <Heart className={`h-4 w-4 ${bookmarked.has(key) ? "fill-pink-500 text-pink-500" : ""}`} />
+                          </button>
                         </div>
-                        <p
-                          className={`${arabicFont} text-xl leading-loose text-right mb-3 text-foreground`}
-                          dir="rtl"
-                        >
-                          {snippet(h.arabic_text, 120)}
-                        </p>
-                        <div className="border-t border-border my-3" />
-                        <p className="text-base leading-relaxed text-foreground">
-                          {snippet(h.english_text)}
-                        </p>
+                        <Link href={href} className="block">
+                          <p
+                            className={`${arabicFont} text-xl leading-loose text-right mb-3 text-foreground`}
+                            dir="rtl"
+                          >
+                            {snippet(h.arabic_text, 120)}
+                          </p>
+                          <div className="border-t border-border my-3" />
+                          <p className="text-base leading-relaxed text-foreground">
+                            {snippet(h.english_text)}
+                          </p>
+                        </Link>
                       </div>
-                    ))
+                    );
+                    })
                   )}
                 </>
               )}
@@ -258,7 +339,10 @@ export default function SearchPage() {
                   {duaResults.length === 0 ? (
                     <EmptyState query={query} lang={lang} />
                   ) : (
-                    duaResults.map((d) => (
+                    duaResults.map((d) => {
+                      const href = `/duas#dua-${d.id}`;
+                      const key = `dua:${d.id}`;
+                      return (
                       <div
                         key={d.id}
                         className="rounded-2xl border border-border bg-card p-5 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-lg transition-all"
@@ -267,22 +351,37 @@ export default function SearchPage() {
                           <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
                             {d.category}
                           </span>
+                          <button
+                            onClick={() => toggleBookmark({
+                              item_type: "dua",
+                              item_id: String(d.id),
+                              title: snippet(d.meaning_en, 80),
+                              href,
+                            })}
+                            className="ml-auto p-1.5 rounded-lg text-muted-foreground hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
+                            title="Bookmark"
+                          >
+                            <Heart className={`h-4 w-4 ${bookmarked.has(key) ? "fill-pink-500 text-pink-500" : ""}`} />
+                          </button>
                         </div>
-                        <p
-                          className={`${arabicFont} text-xl leading-loose text-right mb-3 text-foreground`}
-                          dir="rtl"
-                        >
-                          {snippet(d.arabic, 120)}
-                        </p>
-                        <div className="border-t border-border my-3" />
-                        <p className="text-sm italic text-muted-foreground mb-2">
-                          {snippet(d.transliteration)}
-                        </p>
-                        <p className="text-base leading-relaxed text-foreground">
-                          {snippet(d.meaning_en)}
-                        </p>
+                        <Link href={href} className="block">
+                          <p
+                            className={`${arabicFont} text-xl leading-loose text-right mb-3 text-foreground`}
+                            dir="rtl"
+                          >
+                            {snippet(d.arabic, 120)}
+                          </p>
+                          <div className="border-t border-border my-3" />
+                          <p className="text-sm italic text-muted-foreground mb-2">
+                            {snippet(d.transliteration)}
+                          </p>
+                          <p className="text-base leading-relaxed text-foreground">
+                            {snippet(d.meaning_en)}
+                          </p>
+                        </Link>
                       </div>
-                    ))
+                    );
+                    })
                   )}
                 </>
               )}

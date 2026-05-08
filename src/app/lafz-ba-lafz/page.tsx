@@ -9,8 +9,7 @@ const levels = [
   {
     id: "easy",
     labelKey: "aasaan",
-    englishLabel: "Easy",
-    desc: "Top 50 most frequent Quranic words",
+    descKey: "lafz_easy_desc",
     icon: Zap,
     color: "text-green-600",
     bg: "bg-green-50 dark:bg-green-950/30",
@@ -20,8 +19,7 @@ const levels = [
   {
     id: "medium",
     labelKey: "madhyam",
-    englishLabel: "Medium",
-    desc: "Moderately frequent important words",
+    descKey: "lafz_medium_desc",
     icon: Target,
     color: "text-amber-600",
     bg: "bg-amber-50 dark:bg-amber-950/30",
@@ -31,8 +29,7 @@ const levels = [
   {
     id: "hard",
     labelKey: "kathin",
-    englishLabel: "Hard",
-    desc: "Deep vocabulary for advanced learners",
+    descKey: "lafz_hard_desc",
     icon: Trophy,
     color: "text-red-600",
     bg: "bg-red-50 dark:bg-red-950/30",
@@ -74,12 +71,9 @@ export default function LafzBaLafzPage() {
               </div>
               <div className="flex items-center gap-2 mb-2">
                 <h3 className="text-xl font-bold">{t(lvl.labelKey, lang)}</h3>
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/60 dark:bg-black/20 text-muted-foreground">
-                  {lvl.englishLabel}
-                </span>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                {lvl.desc}
+                {t(lvl.descKey, lang)}
               </p>
               <ArrowRight
                 className={`absolute bottom-6 right-6 h-5 w-5 ${lvl.color} opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all`}

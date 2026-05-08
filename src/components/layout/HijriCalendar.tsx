@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Calendar, Star } from "lucide-react";
+import { useLanguage } from "@/lib/language-context";
+import { t } from "@/lib/translations";
 
 interface HijriDate {
   day: string;
@@ -55,6 +57,7 @@ function daysUntilEvent(
 }
 
 export function HijriCalendar() {
+  const { lang } = useLanguage();
   const [hijriDate, setHijriDate] = useState<HijriDate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -96,7 +99,7 @@ export function HijriCalendar() {
     return (
       <div className="bg-card border border-border rounded-2xl p-5">
         <p className="text-sm text-muted-foreground">
-          Could not load Hijri date.
+          {t("hijri_error", lang)}
         </p>
       </div>
     );
@@ -118,7 +121,7 @@ export function HijriCalendar() {
     <div className="bg-card border border-border rounded-2xl p-5">
       <div className="flex items-center gap-2 mb-3">
         <Calendar className="h-4 w-4 text-emerald-600" />
-        <h3 className="font-semibold text-sm">Islamic Calendar</h3>
+        <h3 className="font-semibold text-sm">{t("hijri_calendar_title", lang)}</h3>
       </div>
 
       <div className="text-2xl font-bold mb-1">
@@ -138,7 +141,7 @@ export function HijriCalendar() {
             </span>
           </div>
           <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-1">
-            in {nextEvent.daysUntil} day{nextEvent.daysUntil !== 1 ? "s" : ""} ·{" "}
+            {t("days_short", lang).replace("{count}", String(nextEvent.daysUntil))} ·{" "}
             {nextEvent.day} {HIJRI_MONTHS[nextEvent.month]}
           </p>
         </div>
@@ -146,7 +149,7 @@ export function HijriCalendar() {
 
       <div className="space-y-1.5">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-          Upcoming Events
+          {t("upcoming_events", lang)}
         </p>
         {upcomingEvents.slice(0, 5).map((event) => (
           <div
@@ -155,7 +158,7 @@ export function HijriCalendar() {
           >
             <span className="text-foreground">{event.name}</span>
             <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
-              {event.daysUntil}d
+              {t("days_short", lang).replace("{count}", String(event.daysUntil))}
             </span>
           </div>
         ))}

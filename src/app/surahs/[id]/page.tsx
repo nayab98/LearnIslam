@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { fetchSurahDetail } from "@/lib/quran-api";
+import { ENABLE_LOCALIZED_LANGUAGES } from "@/lib/feature-flags";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import SurahReader from "@/components/quran/SurahReader";
@@ -37,8 +38,8 @@ export default function SurahDetailPage() {
   if (!isValid) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <h2 className="text-2xl font-bold mb-2">Page Not Found</h2>
-        <p className="text-muted-foreground">Invalid Surah number.</p>
+        <h2 className="text-2xl font-bold mb-2">{t("error_not_found_title", lang)}</h2>
+        <p className="text-muted-foreground">{t("invalid_surah", lang)}</p>
       </div>
     );
   }
@@ -53,6 +54,11 @@ export default function SurahDetailPage() {
 
   const prevSurah = surahNumber > 1 ? surahNumber - 1 : null;
   const nextSurah = surahNumber < 114 ? surahNumber + 1 : null;
+  const showLocalizedName = ENABLE_LOCALIZED_LANGUAGES && (lang === "hi" || lang === "hinglish");
+  const displayName = showLocalizedName ? surah.hindiName : surah.englishName;
+  const subtitle = showLocalizedName
+    ? surah.englishNameTranslation
+    : `${surah.englishNameTranslation} · ${surah.englishName}`;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
@@ -62,7 +68,7 @@ export default function SurahDetailPage() {
           {t("nav_surahs", lang)}
         </Link>
         <span>/</span>
-        <span className="text-foreground font-medium">{surah.hindiName}</span>
+        <span className="text-foreground font-medium">{displayName}</span>
       </div>
 
       {/* Surah header */}
@@ -71,20 +77,11 @@ export default function SurahDetailPage() {
           {t("surah", lang)} {surahNumber} · {surah.revelationType === "Meccan" ? t("makki", lang) : t("madani", lang)} ·{" "}
           {surah.numberOfAyahs} {t("ayatein", lang)}
         </p>
-        <h1 className="text-5xl font-arabic text-foreground mb-2 leading-relaxed">{surah.name}</h1>
+        <h1 className="text-5xl quran-arabic text-foreground mb-2 leading-relaxed">{surah.name}</h1>
         <h2 className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 mb-1">
-          {surah.hindiName}
+          {displayName}
         </h2>
-        {lang !== "en" && (
-          <p className="text-sm text-muted-foreground mt-0.5">{surah.englishName}</p>
-        )}
-        <p className="text-muted-foreground">{surah.englishNameTranslation}</p>
-
-        {surahNumber !== 1 && surahNumber !== 9 && (
-          <div className="mt-6 text-3xl font-arabic text-emerald-800 dark:text-emerald-200">
-            بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ
-          </div>
-        )}
+        <p className="text-muted-foreground">{subtitle}</p>
       </div>
 
       {/* Reader component */}

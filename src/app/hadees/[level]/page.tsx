@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Check, Heart } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { getHadithsByDifficulty, Hadith } from "@/lib/hadiths";
 import { useArabicFont } from "@/lib/useArabicFont";
 import { fetchHadithsPage, HadithRow } from "@/lib/hadith-api";
+import { createClient } from "@/lib/supabase/client";
+import { addBookmark, getBookmarks, removeBookmark } from "@/lib/bookmarks";
+import { recordLearningEvent } from "@/lib/learning-events";
 
 const VALID_LEVELS = ["easy", "medium", "hard"] as const;
 type Level = (typeof VALID_LEVELS)[number];
@@ -68,6 +71,9 @@ export default function HadeesLevelPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [source, setSource] = useState<"supabase" | "local">("supabase");
+  const [userId, setUserId] = useState<string | null>(null);
+  const [bookmarkedHadiths, setBookmarkedHadiths] = useState<Set<string>>(new Set());
+  const [readHadiths, setReadHadiths] = useState<Set<number>>(new Set());
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -98,6 +104,17 @@ export default function HadeesLevelPage() {
   );
 
   useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      const id = data.user?.id || null;
+      setUserId(id);
+      getBookmarks(id).then((bookmarks) => {
+        setBookmarkedHadiths(new Set(bookmarks.filter((b) => b.item_type === "hadith").map((b) => b.item_id)));
+      });
+    });
+  }, []);
+
+  useEffect(() => {
     setPage(1);
     loadPage(1);
   }, [level, loadPage]);
@@ -111,16 +128,16 @@ export default function HadeesLevelPage() {
   if (!VALID_LEVELS.includes(level as Level)) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold mb-4">Invalid Level</h1>
+        <h1 className="text-2xl font-bold mb-4">{t("invalid_level", lang)}</h1>
         <p className="text-muted-foreground mb-6">
-          Level &quot;{level}&quot; is not valid. Please choose easy, medium, or hard.
+          {t("invalid_level_desc", lang)}
         </p>
         <Link
           href="/hadees"
           className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Hadees
+          {t("back_to_hadees", lang)}
         </Link>
       </div>
     );
@@ -141,6 +158,39 @@ export default function HadeesLevelPage() {
     return primary !== h.english_text;
   }
 
+  async function toggleBookmark(h: UnifiedHadith) {
+    const id = String(h.id);
+    if (bookmarkedHadiths.has(id)) {
+      await removeBookmark(userId, "hadith", id);
+      setBookmarkedHadiths((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      return;
+    }
+
+    await addBookmark(userId, {
+      item_type: "hadith",
+      item_id: id,
+      title: translatedText(h).slice(0, 80),
+      href: `/hadees/${validLevel}#hadith-${h.id}`,
+      created_at: new Date().toISOString(),
+    });
+    setBookmarkedHadiths((prev) => new Set(prev).add(id));
+  }
+
+  async function markRead(h: UnifiedHadith) {
+    setReadHadiths((prev) => new Set(prev).add(h.id));
+    await recordLearningEvent({
+      userId,
+      eventType: "hadith_read",
+      itemType: "hadith",
+      itemId: String(h.id),
+      metadata: { collection: h.collection, hadith_number: h.hadith_number },
+    });
+  }
+
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       {/* Back link */}
@@ -149,16 +199,16 @@ export default function HadeesLevelPage() {
         className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Hadees
+        {t("back_to_hadees", lang)}
       </Link>
 
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold">
-          {total} Hadiths — {t(meta.labelKey, lang)} / {meta.englishLabel}
+          {t("hadith_count", lang).replace("{count}", String(total))} — {t(meta.labelKey, lang)}
         </h1>
         {source === "local" && (
-          <p className="text-xs text-muted-foreground mt-1">Showing local data</p>
+          <p className="text-xs text-muted-foreground mt-1">{t("showing_local_data", lang)}</p>
         )}
       </div>
 
@@ -187,8 +237,29 @@ export default function HadeesLevelPage() {
             {hadiths.map((h) => (
               <div
                 key={h.id}
+                id={`hadith-${h.id}`}
                 className="bg-card border border-border rounded-2xl p-6"
               >
+                <div className="flex justify-end gap-2 mb-3">
+                  <button
+                    onClick={() => toggleBookmark(h)}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
+                    title={t("bookmark", lang)}
+                  >
+                    <Heart className={`h-4 w-4 ${bookmarkedHadiths.has(String(h.id)) ? "fill-pink-500 text-pink-500" : ""}`} />
+                  </button>
+                  <button
+                    onClick={() => markRead(h)}
+                    className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                      readHadiths.has(h.id)
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+                        : "border-border text-muted-foreground hover:bg-accent"
+                    }`}
+                  >
+                    <Check className="h-3 w-3" />
+                    {readHadiths.has(h.id) ? t("padha", lang) : t("mark_read", lang)}
+                  </button>
+                </div>
                 {/* Arabic */}
                 <p
                   className={`${arabicFont} text-2xl leading-loose text-right mb-4`}

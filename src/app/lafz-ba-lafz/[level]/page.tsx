@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -8,6 +8,8 @@ import { ArrowLeft } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { WORD_LEVELS, ArabicWord } from "@/lib/arabic-words";
+import { createClient } from "@/lib/supabase/client";
+import { recordLearningEvent, upsertReviewItem } from "@/lib/learning-events";
 
 const VALID_LEVELS = ["easy", "medium", "hard"] as const;
 type Level = (typeof VALID_LEVELS)[number];
@@ -29,14 +31,39 @@ export default function LafzBaLafzLevelPage() {
 
   const words = WORD_LEVELS[level as Level];
   const [flipped, setFlipped] = useState<Set<number>>(new Set());
+  const [userId, setUserId] = useState<string | null>(null);
 
-  const toggle = (idx: number) => {
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
+  }, []);
+
+  const toggle = async (idx: number) => {
     setFlipped((prev) => {
       const next = new Set(prev);
       if (next.has(idx)) next.delete(idx);
       else next.add(idx);
       return next;
     });
+
+    if (!flipped.has(idx)) {
+      const word = words[idx];
+      const itemId = `${level}:${word.arabic}:${word.transliteration}`;
+      await recordLearningEvent({
+        userId,
+        eventType: "word_reviewed",
+        itemType: "word",
+        itemId,
+        metadata: { level, meaning: getMeaning(word, lang) },
+      });
+      await upsertReviewItem({
+        userId,
+        itemType: "word",
+        itemId,
+        title: `${word.arabic} - ${word.meaning_en}`,
+        result: "good",
+      });
+    }
   };
 
   return (
@@ -51,7 +78,7 @@ export default function LafzBaLafzLevelPage() {
           {t("lafz_title", lang)}
         </Link>
         <span className="text-sm text-muted-foreground">
-          {words.length} words
+          {t("words_count", lang).replace("{count}", String(words.length))}
         </span>
       </div>
 

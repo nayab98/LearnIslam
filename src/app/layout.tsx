@@ -10,14 +10,14 @@ import { LanguageProvider } from "@/lib/language-context";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "LearnIslam — Hindi-Urdu mein Quran Seekhein",
+  title: "LearnIslam — Quran, Hadith, Arabic & Islamic Learning",
   description:
-    "Quran, Hadith, Arabic aur Islamic ilm seekhein. Lafz-ba-Lafz matlab, Hindi-Urdu tarjuma, Quiz aur Pragati tracking.",
+    "Learn Quran, Hadith, Arabic, duas, prayer times, quizzes, and progress tracking in one structured learning app.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="hi" className={cn(inter.variable)} suppressHydrationWarning>
+    <html lang="en" className={cn(inter.variable)} suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#059669" />

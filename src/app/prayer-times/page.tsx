@@ -41,6 +41,10 @@ const METHODS = [
   { id: 15, name: "Spiritual Administration of Muslims of Russia" },
 ];
 
+const METHOD_KEY = "learnislam_prayer_method";
+const CITY_KEY = "learnislam_prayer_city";
+const COORDS_KEY = "learnislam_prayer_coords";
+
 function parseTime24(timeStr: string): { hours: number; minutes: number } | null {
   const clean = timeStr.replace(/\s*\(.*\)/, "");
   const parts = clean.split(":");
@@ -62,9 +66,15 @@ export default function PrayerTimesPage() {
   const [timings, setTimings] = useState<Record<string, string> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [method, setMethod] = useState(1);
+  const [method, setMethod] = useState(() => {
+    if (typeof window === "undefined") return 1;
+    return Number(localStorage.getItem(METHOD_KEY)) || 1;
+  });
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [cityInput, setCityInput] = useState("");
+  const [cityInput, setCityInput] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem(CITY_KEY) || "";
+  });
   const [locationDenied, setLocationDenied] = useState(false);
   const [countdown, setCountdown] = useState("");
   const [nextPrayer, setNextPrayer] = useState<PrayerKey | null>(null);
@@ -81,21 +91,34 @@ export default function PrayerTimesPage() {
       if (data.code === 200 && data.data?.timings) {
         setTimings(data.data.timings);
       } else {
-        setError("Could not fetch prayer times.");
+        setError(t("prayer_error_fetch", lang));
       }
     } catch {
-      setError("Network error. Please try again.");
+      setError(t("prayer_error_network", lang));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [lang]);
 
   useEffect(() => {
+    const savedCoords = localStorage.getItem(COORDS_KEY);
+    if (savedCoords) {
+      try {
+        const c = JSON.parse(savedCoords) as { lat: number; lng: number };
+        setCoords(c);
+        fetchTimings(c.lat, c.lng, method);
+        return;
+      } catch {
+        localStorage.removeItem(COORDS_KEY);
+      }
+    }
+
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
           setCoords(c);
+          localStorage.setItem(COORDS_KEY, JSON.stringify(c));
           fetchTimings(c.lat, c.lng, method);
         },
         () => {
@@ -111,6 +134,7 @@ export default function PrayerTimesPage() {
   }, []);
 
   useEffect(() => {
+    localStorage.setItem(METHOD_KEY, String(method));
     if (coords) fetchTimings(coords.lat, coords.lng, method);
   }, [method, coords, fetchTimings]);
 
@@ -160,13 +184,15 @@ export default function PrayerTimesPage() {
       if (data.results?.[0]) {
         const c = { lat: data.results[0].latitude, lng: data.results[0].longitude };
         setCoords(c);
+        localStorage.setItem(COORDS_KEY, JSON.stringify(c));
+        localStorage.setItem(CITY_KEY, cityInput.trim());
         setLocationDenied(false);
       } else {
-        setError("City not found. Try another name.");
+        setError(t("prayer_city_not_found", lang));
         setLoading(false);
       }
     } catch {
-      setError("Could not search city.");
+      setError(t("prayer_error_city_search", lang));
       setLoading(false);
     }
   };
@@ -202,7 +228,7 @@ export default function PrayerTimesPage() {
                 value={cityInput}
                 onChange={(e) => setCityInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCitySearch()}
-                placeholder="e.g. Delhi, Mumbai, Karachi..."
+                placeholder={t("prayer_city_placeholder", lang)}
                 className="flex-1 px-4 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
               <button
@@ -227,6 +253,9 @@ export default function PrayerTimesPage() {
               <option key={m.id} value={m.id}>{m.name}</option>
             ))}
           </select>
+          <p className="text-xs text-muted-foreground mt-2">
+            {t("prayer_pref_saved", lang)}
+          </p>
         </div>
 
         {/* Loading */}

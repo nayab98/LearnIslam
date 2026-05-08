@@ -1,7 +1,126 @@
 import { Surah, SurahDetail, Ayah } from "@/types";
+import { ENABLE_LOCALIZED_LANGUAGES } from "@/lib/feature-flags";
 
 const BASE_URL = "https://api.alquran.cloud/v1";
 const QURAN_COM_BASE = "https://api.quran.com/api/v4";
+
+// English meaning/translation for all 114 Surahs
+const ENGLISH_TRANSLATIONS: Record<number, string> = {
+  1: "The Opening",
+  2: "The Cow",
+  3: "The Family of Imran",
+  4: "The Women",
+  5: "The Table Spread",
+  6: "The Cattle",
+  7: "The Heights",
+  8: "The Spoils of War",
+  9: "The Repentance",
+  10: "Jonah",
+  11: "Hud",
+  12: "Joseph",
+  13: "The Thunder",
+  14: "Abraham",
+  15: "The Rocky Tract",
+  16: "The Bee",
+  17: "The Night Journey",
+  18: "The Cave",
+  19: "Mary",
+  20: "Ta-Ha",
+  21: "The Prophets",
+  22: "The Pilgrimage",
+  23: "The Believers",
+  24: "The Light",
+  25: "The Criterion",
+  26: "The Poets",
+  27: "The Ant",
+  28: "The Stories",
+  29: "The Spider",
+  30: "The Romans",
+  31: "Luqman",
+  32: "The Prostration",
+  33: "The Combined Forces",
+  34: "Sheba",
+  35: "The Originator",
+  36: "Ya Sin",
+  37: "Those Who Set The Ranks",
+  38: "Sad",
+  39: "The Troops",
+  40: "The Forgiver",
+  41: "Explained in Detail",
+  42: "The Consultation",
+  43: "The Ornaments of Gold",
+  44: "The Smoke",
+  45: "The Crouching",
+  46: "The Wind-Curved Sandhills",
+  47: "Muhammad",
+  48: "The Victory",
+  49: "The Rooms",
+  50: "Qaf",
+  51: "The Winnowing Winds",
+  52: "The Mount",
+  53: "The Star",
+  54: "The Moon",
+  55: "The Beneficent",
+  56: "The Inevitable",
+  57: "The Iron",
+  58: "The Pleading Woman",
+  59: "The Exile",
+  60: "She That Is To Be Examined",
+  61: "The Ranks",
+  62: "Friday",
+  63: "The Hypocrites",
+  64: "The Mutual Disillusion",
+  65: "The Divorce",
+  66: "The Prohibtiion",
+  67: "The Sovereignty",
+  68: "The Pen",
+  69: "The Reality",
+  70: "The Ascending Stairways",
+  71: "Noah",
+  72: "The Jinn",
+  73: "The Enshrouded One",
+  74: "The Cloaked One",
+  75: "The Resurrection",
+  76: "The Man",
+  77: "The Emissaries",
+  78: "The Tidings",
+  79: "Those Who Drag Forth",
+  80: "He Frowned",
+  81: "The Overthrowing",
+  82: "The Cleaving",
+  83: "The Defrauding",
+  84: "The Sundering",
+  85: "The Mansions of the Stars",
+  86: "The Nightcomer",
+  87: "The Most High",
+  88: "The Overwhelming",
+  89: "The Dawn",
+  90: "The City",
+  91: "The Sun",
+  92: "The Night",
+  93: "The Morning Hours",
+  94: "The Relief",
+  95: "The Fig",
+  96: "The Clot",
+  97: "The Power",
+  98: "The Clear Proof",
+  99: "The Earthquake",
+  100: "The Courser",
+  101: "The Calamity",
+  102: "The Rivalry in World Increase",
+  103: "The Declining Day",
+  104: "The Traducer",
+  105: "The Elephant",
+  106: "Quraysh",
+  107: "The Small Kindnesses",
+  108: "The Abundance",
+  109: "The Disbelievers",
+  110: "The Divine Support",
+  111: "The Palm Fibre",
+  112: "The Sincerity",
+  113: "The Daybreak",
+  114: "The Mankind",
+};
 
 // Hinglish names for all 114 Surahs
 const HINDI_NAMES: Record<number, string> = {
@@ -131,7 +250,7 @@ export async function fetchSurahList(): Promise<Surah[]> {
     number: s.number,
     name: s.name,
     englishName: s.englishName,
-    englishNameTranslation: s.englishNameTranslation,
+    englishNameTranslation: ENGLISH_TRANSLATIONS[s.number as number] || String(s.englishNameTranslation),
     hindiName: HINDI_NAMES[s.number as number] || String(s.englishName),
     numberOfAyahs: s.numberOfAyahs,
     revelationType: s.revelationType,
@@ -141,7 +260,9 @@ export async function fetchSurahList(): Promise<Surah[]> {
 export async function fetchSurahDetail(surahNumber: number): Promise<SurahDetail> {
   const [arabicRes, hindiRes, englishRes, audioRes] = await Promise.all([
     fetch(`${BASE_URL}/surah/${surahNumber}`, { next: { revalidate: 86400 } }),
-    fetch(`${BASE_URL}/surah/${surahNumber}/hi.farooq`, { next: { revalidate: 86400 } }),
+    ENABLE_LOCALIZED_LANGUAGES
+      ? fetch(`${BASE_URL}/surah/${surahNumber}/hi.farooq`, { next: { revalidate: 86400 } })
+      : Promise.resolve(null),
     fetch(`${BASE_URL}/surah/${surahNumber}/en.sahih`, { next: { revalidate: 86400 } }),
     fetch(`${BASE_URL}/surah/${surahNumber}/ar.alafasy`, { next: { revalidate: 86400 } }),
   ]);
@@ -150,7 +271,7 @@ export async function fetchSurahDetail(surahNumber: number): Promise<SurahDetail
 
   const [arabicData, hindiData, englishData, audioData] = await Promise.all([
     arabicRes.json(),
-    hindiRes.ok ? hindiRes.json() : null,
+    hindiRes?.ok ? hindiRes.json() : null,
     englishRes.ok ? englishRes.json() : null,
     audioRes.ok ? audioRes.json() : null,
   ]);
@@ -180,29 +301,38 @@ export async function fetchSurahDetail(surahNumber: number): Promise<SurahDetail
     number: surahInfo.number,
     name: surahInfo.name,
     englishName: surahInfo.englishName,
-    englishNameTranslation: surahInfo.englishNameTranslation,
+    englishNameTranslation: ENGLISH_TRANSLATIONS[surahInfo.number] || surahInfo.englishNameTranslation,
     hindiName: HINDI_NAMES[surahInfo.number] || surahInfo.englishName,
     numberOfAyahs: surahInfo.numberOfAyahs,
     revelationType: surahInfo.revelationType,
   };
 
-  const ayahs: Ayah[] = surahInfo.ayahs.map((a: Record<string, unknown>) => ({
-    number: a.number,
-    numberInSurah: a.numberInSurah,
-    text: a.text,
-    translation_hi: hindiAyahs[a.numberInSurah as number] || "",
-    translation_en: englishAyahs[a.numberInSurah as number] || "",
-    translation: hindiAyahs[a.numberInSurah as number] || englishAyahs[a.numberInSurah as number] || "",
-    audio: audioMap[a.numberInSurah as number] || "",
-  }));
+  const ayahs: Ayah[] = surahInfo.ayahs.map((a: Record<string, unknown>) => {
+    const ayahNumber = a.numberInSurah as number;
+    const englishTranslation = englishAyahs[ayahNumber] || "";
+    const hindiTranslation = hindiAyahs[ayahNumber] || "";
+
+    return {
+      number: a.number,
+      numberInSurah: a.numberInSurah,
+      text: a.text,
+      translation_hi: hindiTranslation,
+      translation_en: englishTranslation,
+      translation: ENABLE_LOCALIZED_LANGUAGES
+        ? hindiTranslation || englishTranslation
+        : englishTranslation,
+      audio: audioMap[ayahNumber] || "",
+    };
+  });
 
   return { surah, ayahs };
 }
 
 export async function fetchWordByWord(surahNumber: number, ayahNumber: number) {
   try {
+    const language = ENABLE_LOCALIZED_LANGUAGES ? "ur" : "en";
     const res = await fetch(
-      `${QURAN_COM_BASE}/verses/by_key/${surahNumber}:${ayahNumber}?language=ur&words=true&word_fields=text_uthmani,transliteration,translation`,
+      `${QURAN_COM_BASE}/verses/by_key/${surahNumber}:${ayahNumber}?language=${language}&words=true&word_fields=text_uthmani,transliteration,translation`,
       { next: { revalidate: 86400 } }
     );
     if (!res.ok) return null;

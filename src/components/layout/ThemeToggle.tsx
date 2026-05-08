@@ -1,6 +1,7 @@
 "use client";
 
 import { useLanguage, type Theme } from "@/lib/language-context";
+import { t } from "@/lib/translations";
 import { Sun, Moon, Monitor } from "lucide-react";
 
 const options: { value: Theme; icon: typeof Sun }[] = [
@@ -10,7 +11,7 @@ const options: { value: Theme; icon: typeof Sun }[] = [
 ];
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useLanguage();
+  const { lang, theme, setTheme } = useLanguage();
 
   return (
     <div className="flex items-center gap-1">
@@ -25,7 +26,7 @@ export function ThemeToggle() {
                 ? "bg-emerald-600 text-white"
                 : "border border-border text-muted-foreground hover:bg-accent"
             }`}
-            title={opt.value.charAt(0).toUpperCase() + opt.value.slice(1)}
+            title={t(`theme_${opt.value}`, lang)}
           >
             <Icon className="h-3.5 w-3.5" />
           </button>

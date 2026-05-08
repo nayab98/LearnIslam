@@ -1,17 +1,17 @@
-# LearnIslam ☪
+# LearnIslam
 
-**Interactive Islamic learning platform for Hindi-Urdu speakers — Quran, Hadith, Arabic & more.**
+**English-first Islamic learning platform for Quran, Hadith, Arabic, duas, quizzes, and progress tracking.**
 
-हिंदी-उर्दू बोलने वाले भारतीयों के लिए क़ुरआन सीखने का सबसे आसान तरीका।
+Hindi and Hinglish localization content remains in the codebase behind `ENABLE_LOCALIZED_LANGUAGES` for a future re-enable.
 
 ## Features
 
-- 📖 **114 Surahs** — Arabic text + Hindi-Urdu translation side by side
-- ✦ **Word-by-Word Mode** — Click any Arabic word to see its Hindi-Urdu meaning
-- 🎧 **Audio Recitation** — Mishary Alafasy's recitation, play full Surah or individual ayahs
-- 🧠 **Quiz System** — Interactive MCQ challenges across 5 categories, 3 difficulty levels (Easy/Medium/Hard)
-- 📊 **Progress Dashboard** — Streaks, XP, completed Surahs, quiz accuracy
-- 🔐 **Auth** — Sign up / Log in via Supabase
+- **114 Surahs** — Arabic text with English translation and Surah metadata
+- **Word-by-Word Mode** — Click any Arabic word to see its meaning
+- **Audio Recitation** — Mishary Alafasy's recitation, play full Surah or individual ayahs
+- **Quiz System** — Interactive MCQ challenges across 5 categories, 3 difficulty levels (Easy/Medium/Hard)
+- **Progress Dashboard** — Streaks, XP, completed Surahs, quiz accuracy
+- **Auth** — Sign up / Log in via Supabase
 
 ## Tech Stack
 
@@ -63,8 +63,8 @@ Open [http://localhost:3000](http://localhost:3000)
 | Route | Description |
 |-------|-------------|
 | `/` | Landing page |
-| `/surahs` | All 114 Surahs with Hindi names |
-| `/surahs/[1-114]` | Surah reader with audio + word-by-word |
+| `/surahs` | All 114 Surahs with English names |
+| `/surahs/[1-114]` | Surah reader with English translation, audio, and word-by-word |
 | `/quiz` | Quiz difficulty picker |
 | `/quiz/easy` | Easy quiz (Surahs 108–114) |
 | `/quiz/medium` | Medium quiz (Surahs 67–107) |
@@ -80,6 +80,10 @@ See `supabase-schema.sql` for the complete schema including:
 - `progress` — per-ayah read/memorized tracking  
 - `quiz_attempts` — quiz history
 - `streaks` — daily streak tracking
+
+## Localization Flag
+
+Hindi/Hinglish UI and content fields are preserved for later, but hidden by default. To test them locally, flip `ENABLE_LOCALIZED_LANGUAGES` in `src/lib/feature-flags.ts`.
 
 ## Deployment
 
