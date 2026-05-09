@@ -7,7 +7,8 @@ import { ENABLE_LOCALIZED_LANGUAGES } from "@/lib/feature-flags";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { useArabicFont } from "@/lib/useArabicFont";
-import { CURATED_HADITHS } from "@/lib/hadiths";
+import { CURATED_HADITHS, getHadithLearningTier, getHadithSourceName } from "@/lib/hadiths";
+import { getHadithTierConfig, getHadithTierSlug, HadithLearningTier } from "@/lib/hadith-tiers";
 import { DUAS } from "@/lib/duas";
 import { addBookmark, getBookmarks, removeBookmark } from "@/lib/bookmarks";
 import { createClient } from "@/lib/supabase/client";
@@ -30,6 +31,10 @@ interface HadithMatch {
   narrator_en: string;
   arabic_text: string;
   english_text: string;
+  difficulty: string;
+  learning_tier?: HadithLearningTier | null;
+  source_name?: string | null;
+  chapter?: string | null;
 }
 
 interface DuaMatch {
@@ -332,7 +337,8 @@ export default function SearchPage() {
                     <EmptyState query={query} lang={lang} />
                   ) : (
                     hadithResults.map((h) => {
-                      const href = `/hadees/${h.collection === "bukhari" ? "easy" : "medium"}#hadith-${h.id}`;
+                      const tier = getHadithLearningTier(h);
+                      const href = `/hadees/${getHadithTierSlug(tier)}#hadith-${h.id}`;
                       const key = `hadith:${h.id}`;
                       return (
                       <div
@@ -376,6 +382,8 @@ export default function SearchPage() {
                               { label: "Hadith", value: `${h.collection.replace("_", " ")} #${h.hadith_number}` },
                               { label: "Grade", value: h.grade.toUpperCase() },
                               { label: "Narrator", value: h.narrator_en },
+                              { label: "Tier", value: getHadithTierConfig(tier).label },
+                              { label: "Source", value: getHadithSourceName(h) },
                             ]}
                           />
                         </Link>

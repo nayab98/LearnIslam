@@ -162,7 +162,7 @@ export default function DashboardPage() {
     {
       title: t("daily_hadith_task", lang),
       desc: t("daily_hadith_task_desc", lang),
-      href: "/hadees/easy",
+      href: "/hadees/must-know",
       progress: Math.min(today.hadith_read, 1),
       target: 1,
     },

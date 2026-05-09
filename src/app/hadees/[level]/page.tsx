@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { ArrowLeft, Check, Heart } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
-import { getHadithsByDifficulty, Hadith } from "@/lib/hadiths";
+import { getHadithLearningTier, getHadithsByLearningTier, getHadithSourceName, Hadith } from "@/lib/hadiths";
 import { useArabicFont } from "@/lib/useArabicFont";
 import { fetchHadithsPage, HadithRow } from "@/lib/hadith-api";
 import { createClient } from "@/lib/supabase/client";
@@ -14,25 +14,13 @@ import { addBookmark, getBookmarks, removeBookmark } from "@/lib/bookmarks";
 import { recordLearningEvent } from "@/lib/learning-events";
 import { cleanArabicTextForDisplay } from "@/lib/quran-text";
 import { SourceTrust } from "@/components/common/SourceTrust";
-
-const VALID_LEVELS = ["easy", "medium", "hard"] as const;
-type Level = (typeof VALID_LEVELS)[number];
-
-const levelLabels: Record<Level, { labelKey: string; englishLabel: string }> = {
-  easy: { labelKey: "aasaan", englishLabel: "Easy" },
-  medium: { labelKey: "madhyam", englishLabel: "Medium" },
-  hard: { labelKey: "kathin", englishLabel: "Hard" },
-};
-
-function collectionLabel(c: string) {
-  const map: Record<string, string> = {
-    bukhari: "Sahih Bukhari",
-    muslim: "Sahih Muslim",
-    abu_dawud: "Abu Dawud",
-    tirmidhi: "Jami at-Tirmidhi",
-  };
-  return map[c] ?? c;
-}
+import {
+  getHadithTierConfig,
+  getHadithTierSlug,
+  HadithLearningTier,
+  HadithReviewStatus,
+  resolveHadithTierParam,
+} from "@/lib/hadith-tiers";
 
 type UnifiedHadith = {
   id: number;
@@ -42,8 +30,16 @@ type UnifiedHadith = {
   hinglish_text?: string | null;
   narrator_en: string;
   collection: string;
+  source_name?: string | null;
+  book_name?: string | null;
+  chapter?: string | null;
   hadith_number: number;
   grade: string;
+  difficulty: string;
+  learning_tier: HadithLearningTier;
+  review_status: HadithReviewStatus;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
 };
 
 function toUnified(h: HadithRow | Hadith): UnifiedHadith {
@@ -55,8 +51,16 @@ function toUnified(h: HadithRow | Hadith): UnifiedHadith {
     hinglish_text: "hinglish_text" in h ? h.hinglish_text : null,
     narrator_en: h.narrator_en,
     collection: h.collection,
+    source_name: "source_name" in h ? h.source_name : null,
+    book_name: "book_name" in h ? h.book_name : null,
+    chapter: "chapter" in h ? h.chapter : null,
     hadith_number: h.hadith_number,
     grade: h.grade,
+    difficulty: h.difficulty,
+    learning_tier: "learning_tier" in h && h.learning_tier ? h.learning_tier : getHadithLearningTier(h),
+    review_status: ("review_status" in h && h.review_status ? h.review_status : "source_listed") as HadithReviewStatus,
+    reviewed_by: "reviewed_by" in h ? h.reviewed_by : null,
+    reviewed_at: "reviewed_at" in h ? h.reviewed_at : null,
   };
 }
 
@@ -67,6 +71,7 @@ export default function HadeesLevelPage() {
   const arabicFont = useArabicFont();
   const params = useParams();
   const level = params.level as string;
+  const tier = resolveHadithTierParam(level);
 
   const [hadiths, setHadiths] = useState<UnifiedHadith[]>([]);
   const [total, setTotal] = useState(0);
@@ -81,10 +86,10 @@ export default function HadeesLevelPage() {
 
   const loadPage = useCallback(
     async (p: number) => {
-      if (!VALID_LEVELS.includes(level as Level)) return;
+      if (!tier) return;
       setLoading(true);
       try {
-        const res = await fetchHadithsPage(level, p);
+        const res = await fetchHadithsPage(tier, p);
         if (res.hadiths.length > 0 || res.total > 0) {
           setHadiths(res.hadiths.map(toUnified));
           setTotal(res.total);
@@ -93,7 +98,7 @@ export default function HadeesLevelPage() {
           throw new Error("empty");
         }
       } catch {
-        const local = getHadithsByDifficulty(level as Level);
+        const local = getHadithsByLearningTier(tier);
         const start = (p - 1) * PAGE_SIZE;
         setHadiths(local.slice(start, start + PAGE_SIZE).map(toUnified));
         setTotal(local.length);
@@ -102,7 +107,7 @@ export default function HadeesLevelPage() {
         setLoading(false);
       }
     },
-    [level],
+    [tier],
   );
 
   useEffect(() => {
@@ -127,12 +132,12 @@ export default function HadeesLevelPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  if (!VALID_LEVELS.includes(level as Level)) {
+  if (!tier) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold mb-4">{t("invalid_level", lang)}</h1>
+        <h1 className="text-2xl font-bold mb-4">Invalid Hadith Tier</h1>
         <p className="text-muted-foreground mb-6">
-          {t("invalid_level_desc", lang)}
+          Choose Must Know, Good to Know, or Deep Dive.
         </p>
         <Link
           href="/hadees"
@@ -145,8 +150,8 @@ export default function HadeesLevelPage() {
     );
   }
 
-  const validLevel = level as Level;
-  const meta = levelLabels[validLevel];
+  const meta = getHadithTierConfig(tier);
+  const canonicalSlug = getHadithTierSlug(tier);
 
   function translatedText(h: UnifiedHadith) {
     if (lang === "hi") return h.hindi_text || h.english_text;
@@ -176,7 +181,7 @@ export default function HadeesLevelPage() {
       item_type: "hadith",
       item_id: id,
       title: translatedText(h).slice(0, 80),
-      href: `/hadees/${validLevel}#hadith-${h.id}`,
+      href: `/hadees/${canonicalSlug}#hadith-${h.id}`,
       created_at: new Date().toISOString(),
     });
     setBookmarkedHadiths((prev) => new Set(prev).add(id));
@@ -189,7 +194,7 @@ export default function HadeesLevelPage() {
       eventType: "hadith_read",
       itemType: "hadith",
       itemId: String(h.id),
-      metadata: { collection: h.collection, hadith_number: h.hadith_number },
+      metadata: { collection: h.collection, hadith_number: h.hadith_number, learning_tier: h.learning_tier },
     });
   }
 
@@ -207,8 +212,9 @@ export default function HadeesLevelPage() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold">
-          {t("hadith_count", lang).replace("{count}", String(total))} — {t(meta.labelKey, lang)}
+          {t("hadith_count", lang).replace("{count}", String(total))} — {meta.label}
         </h1>
+        <p className="text-sm text-muted-foreground mt-1">{meta.description}</p>
         {source === "local" && (
           <p className="text-xs text-muted-foreground mt-1">{t("showing_local_data", lang)}</p>
         )}
@@ -291,7 +297,10 @@ export default function HadeesLevelPage() {
                   </span>
                   <span className="sm:ml-auto inline-flex flex-wrap items-center gap-1.5">
                     <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                      {collectionLabel(h.collection)} #{h.hadith_number}
+                      {getHadithSourceName(h)} #{h.hadith_number}
+                    </span>
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
+                      {getHadithTierConfig(h.learning_tier).label}
                     </span>
                     <span
                       className={`text-xs font-medium px-2 py-0.5 rounded-full ${
@@ -306,10 +315,13 @@ export default function HadeesLevelPage() {
                 </div>
                 <SourceTrust
                   className="mt-3"
+                  reviewStatus={h.review_status === "reviewed" || h.review_status === "published" ? "source_listed" : "needs_review"}
                   items={[
-                    { label: "Hadith", value: `${collectionLabel(h.collection)} #${h.hadith_number}` },
+                    { label: "Hadith", value: `${getHadithSourceName(h)} #${h.hadith_number}` },
                     { label: "Grade", value: h.grade.toUpperCase() },
                     { label: "Narrator", value: h.narrator_en },
+                    { label: "Tier", value: getHadithTierConfig(h.learning_tier).label },
+                    { label: "Chapter", value: h.chapter || "" },
                   ]}
                 />
               </div>

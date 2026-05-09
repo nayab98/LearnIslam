@@ -208,9 +208,9 @@ const translations: Record<string, Record<Lang, string>> = {
 
   // HADEES PAGE
   hadees_title: { hi: "हदीस", hinglish: "Hadees", en: "Hadith" },
-  hadees_subtitle: { hi: "प्रामाणिक हदीसें पढ़ें", hinglish: "Praamanik Hadeesein Padhein", en: "Read authentic hadith" },
+  hadees_subtitle: { hi: "प्रामाणिक हदीसें पढ़ें", hinglish: "Praamanik Hadeesein Padhein", en: "Browse hadith by learning tier with source and grade metadata" },
   feat_hadees_title: { hi: "हदीस", hinglish: "Hadees", en: "Hadith" },
-  feat_hadees_desc: { hi: "सहीह बुखारी, मुस्लिम और अन्य प्रामाणिक हदीसें", hinglish: "Sahih Bukhari, Muslim aur anya praamanik hadeesein", en: "Authentic hadiths from Sahih Bukhari, Muslim and more" },
+  feat_hadees_desc: { hi: "सहीह बुखारी, मुस्लिम और अन्य प्रामाणिक हदीसें", hinglish: "Sahih Bukhari, Muslim aur anya praamanik hadeesein", en: "Must Know, Good to Know, and Deep Dive hadith paths" },
   quiz_cat_hadith: { hi: "हदीसों का क्विज़", hinglish: "Hadeeso ka Quiz", en: "Hadith Quiz" },
   quiz_cat_word: { hi: "शब्दों के अर्थ", hinglish: "Lafz ke Matlab", en: "Word Meaning" },
   quiz_cat_ayah_comp: { hi: "आयत पूरी करें", hinglish: "Aayat Poori Karein", en: "Ayah Completion" },

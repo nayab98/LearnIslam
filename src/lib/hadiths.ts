@@ -1,3 +1,10 @@
+import {
+  HadithDifficulty,
+  HadithLearningTier,
+  HadithReviewStatus,
+  learningTierForDifficulty,
+} from "@/lib/hadith-tiers";
+
 export interface Hadith {
   id: number;
   arabic_text: string;
@@ -6,7 +13,14 @@ export interface Hadith {
   collection: "bukhari" | "muslim" | "abu_dawud" | "tirmidhi";
   hadith_number: number;
   grade: "sahih" | "hasan";
-  difficulty: "easy" | "medium" | "hard";
+  difficulty: HadithDifficulty;
+  learning_tier?: HadithLearningTier;
+  source_name?: string;
+  book_name?: string | null;
+  chapter?: string | null;
+  review_status?: HadithReviewStatus;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
   topic: string;
 }
 
@@ -1668,4 +1682,26 @@ export const CURATED_HADITHS: Hadith[] = [
 
 export function getHadithsByDifficulty(level: "easy" | "medium" | "hard"): Hadith[] {
   return CURATED_HADITHS.filter((h) => h.difficulty === level);
+}
+
+export function getHadithLearningTier(hadith: {
+  difficulty: HadithDifficulty | string;
+  learning_tier?: HadithLearningTier | null;
+}): HadithLearningTier {
+  return hadith.learning_tier ?? learningTierForDifficulty(hadith.difficulty);
+}
+
+export function getHadithsByLearningTier(tier: HadithLearningTier): Hadith[] {
+  return CURATED_HADITHS.filter((h) => getHadithLearningTier(h) === tier);
+}
+
+export function getHadithSourceName(hadith: { source_name?: string | null; collection: string }): string {
+  if (hadith.source_name) return hadith.source_name;
+  const map: Record<string, string> = {
+    bukhari: "Sahih Bukhari",
+    muslim: "Sahih Muslim",
+    abu_dawud: "Sunan Abu Dawud",
+    tirmidhi: "Jami at-Tirmidhi",
+  };
+  return map[hadith.collection] ?? hadith.collection;
 }
