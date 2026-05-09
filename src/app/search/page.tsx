@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, FormEvent } from "react";
 import Link from "next/link";
-import { Search, Loader2, BookOpen, BookText, BookHeart, Heart, ExternalLink } from "lucide-react";
+import { Search, Loader2, BookOpen, BookText, BookHeart, Heart, ExternalLink, Clock, Sparkles } from "lucide-react";
 import { ENABLE_LOCALIZED_LANGUAGES } from "@/lib/feature-flags";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
@@ -11,6 +11,8 @@ import { CURATED_HADITHS } from "@/lib/hadiths";
 import { DUAS } from "@/lib/duas";
 import { addBookmark, getBookmarks, removeBookmark } from "@/lib/bookmarks";
 import { createClient } from "@/lib/supabase/client";
+import { cleanArabicTextForDisplay } from "@/lib/quran-text";
+import { SourceTrust } from "@/components/common/SourceTrust";
 
 interface QuranMatch {
   number: number;
@@ -24,6 +26,8 @@ interface HadithMatch {
   id: number;
   collection: string;
   hadith_number: number;
+  grade: string;
+  narrator_en: string;
   arabic_text: string;
   english_text: string;
 }
@@ -34,9 +38,12 @@ interface DuaMatch {
   arabic: string;
   transliteration: string;
   meaning_en: string;
+  reference: string;
 }
 
 type Tab = "quran" | "hadith" | "duas";
+const RECENT_SEARCHES_KEY = "learnislam_recent_searches";
+const SUGGESTED_SEARCHES = ["mercy", "prayer", "Al-Waqi'a", "forgiveness", "patience", "morning dua"];
 
 export default function SearchPage() {
   const { lang } = useLanguage();
@@ -47,12 +54,14 @@ export default function SearchPage() {
   const [activeTab, setActiveTab] = useState<Tab>("quran");
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [quranError, setQuranError] = useState(false);
 
   const [quranResults, setQuranResults] = useState<QuranMatch[]>([]);
   const [hadithResults, setHadithResults] = useState<HadithMatch[]>([]);
   const [duaResults, setDuaResults] = useState<DuaMatch[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [bookmarked, setBookmarked] = useState<Set<string>>(new Set());
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -63,20 +72,29 @@ export default function SearchPage() {
         setBookmarked(new Set(items.map((item) => `${item.item_type}:${item.item_id}`)));
       });
     });
+    try {
+      setRecentSearches(JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || "[]"));
+    } catch {
+      setRecentSearches([]);
+    }
   }, []);
 
-  const handleSearch = useCallback(
-    async (e: FormEvent) => {
-      e.preventDefault();
-      const q = input.trim();
+  const runSearch = useCallback(
+    async (rawQuery: string) => {
+      const q = rawQuery.trim();
       if (!q) return;
 
+      setInput(q);
       setQuery(q);
       setSearched(true);
       setLoading(true);
+      setQuranError(false);
       setQuranResults([]);
       setHadithResults([]);
       setDuaResults([]);
+      const nextRecent = [q, ...recentSearches.filter((item) => item.toLowerCase() !== q.toLowerCase())].slice(0, 6);
+      setRecentSearches(nextRecent);
+      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(nextRecent));
 
       const lower = q.toLowerCase();
 
@@ -84,7 +102,9 @@ export default function SearchPage() {
       const hadithMatches = CURATED_HADITHS.filter(
         (h) =>
           h.english_text.toLowerCase().includes(lower) ||
-          h.arabic_text.includes(q)
+          h.arabic_text.includes(q) ||
+          h.narrator_en.toLowerCase().includes(lower) ||
+          h.collection.toLowerCase().includes(lower)
       );
       setHadithResults(hadithMatches);
 
@@ -92,13 +112,16 @@ export default function SearchPage() {
       const duaMatches = DUAS.filter(
         (d) =>
           d.meaning_en.toLowerCase().includes(lower) ||
-          d.transliteration.toLowerCase().includes(lower)
+          d.transliteration.toLowerCase().includes(lower) ||
+          d.reference.toLowerCase().includes(lower) ||
+          d.arabic.includes(q)
       ).map((d) => ({
         id: d.id,
         category: d.category,
         arabic: d.arabic,
         transliteration: d.transliteration,
         meaning_en: d.meaning_en,
+        reference: d.reference,
       }));
       setDuaResults(duaMatches);
 
@@ -113,14 +136,24 @@ export default function SearchPage() {
           const data = await res.json();
           const matches: QuranMatch[] = data?.data?.matches ?? [];
           setQuranResults(matches.slice(0, 50));
+        } else {
+          setQuranError(true);
         }
       } catch {
-        // API failure — leave empty
+        setQuranError(true);
       } finally {
         setLoading(false);
       }
     },
-    [input, lang]
+    [lang, recentSearches]
+  );
+
+  const handleSearch = useCallback(
+    async (e: FormEvent) => {
+      e.preventDefault();
+      await runSearch(input);
+    },
+    [input, runSearch]
   );
 
   const tabs: { key: Tab; label: string; count: number; icon: typeof BookOpen }[] = [
@@ -233,6 +266,11 @@ export default function SearchPage() {
               {/* Quran tab */}
               {activeTab === "quran" && (
                 <>
+                  {quranError && (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                      Quran search is temporarily unavailable. Hadith and dua matches are still shown from local content.
+                    </div>
+                  )}
                   {quranResults.length === 0 ? (
                     <EmptyState query={query} lang={lang} />
                   ) : (
@@ -269,6 +307,13 @@ export default function SearchPage() {
                           <p className="text-base leading-relaxed text-foreground">
                             {snippet(m.text)}
                           </p>
+                          <SourceTrust
+                            className="mt-3"
+                            items={[
+                              { label: "Search source", value: m.edition.identifier },
+                              { label: "Reference", value: `${m.surah.englishName} ${m.surah.number}:${m.numberInSurah}` },
+                            ]}
+                          />
                           <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 mt-3 font-medium">
                             {t("open_result", lang)} <ExternalLink className="h-3 w-3" />
                           </span>
@@ -319,12 +364,20 @@ export default function SearchPage() {
                             className={`${arabicFont} text-xl leading-loose text-right mb-3 text-foreground`}
                             dir="rtl"
                           >
-                            {snippet(h.arabic_text, 120)}
+                            {snippet(cleanArabicTextForDisplay(h.arabic_text), 120)}
                           </p>
                           <div className="border-t border-border my-3" />
                           <p className="text-base leading-relaxed text-foreground">
                             {snippet(h.english_text)}
                           </p>
+                          <SourceTrust
+                            className="mt-3"
+                            items={[
+                              { label: "Hadith", value: `${h.collection.replace("_", " ")} #${h.hadith_number}` },
+                              { label: "Grade", value: h.grade.toUpperCase() },
+                              { label: "Narrator", value: h.narrator_en },
+                            ]}
+                          />
                         </Link>
                       </div>
                     );
@@ -369,7 +422,7 @@ export default function SearchPage() {
                             className={`${arabicFont} text-xl leading-loose text-right mb-3 text-foreground`}
                             dir="rtl"
                           >
-                            {snippet(d.arabic, 120)}
+                            {snippet(cleanArabicTextForDisplay(d.arabic), 120)}
                           </p>
                           <div className="border-t border-border my-3" />
                           <p className="text-sm italic text-muted-foreground mb-2">
@@ -378,6 +431,13 @@ export default function SearchPage() {
                           <p className="text-base leading-relaxed text-foreground">
                             {snippet(d.meaning_en)}
                           </p>
+                          <SourceTrust
+                            className="mt-3"
+                            items={[
+                              { label: "Reference", value: d.reference },
+                              { label: "Content", value: "Curated dua collection" },
+                            ]}
+                          />
                         </Link>
                       </div>
                     );
@@ -392,11 +452,57 @@ export default function SearchPage() {
 
       {/* Initial state */}
       {!searched && (
-        <div className="text-center py-20">
-          <Search className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
-          <p className="text-muted-foreground text-lg">
-            {t("search_placeholder", lang)}
-          </p>
+        <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="h-5 w-5 text-emerald-600" />
+            <h2 className="font-semibold">Start with a suggested search</h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {SUGGESTED_SEARCHES.map((suggestion) => (
+              <button
+                key={suggestion}
+                onClick={() => runSearch(suggestion)}
+                className="rounded-full border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground hover:border-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"
+              >
+                try: {suggestion}
+              </button>
+            ))}
+          </div>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {tabs.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm ${
+                  activeTab === key
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+                    : "border-border text-muted-foreground hover:bg-accent"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+          {recentSearches.length > 0 && (
+            <div className="mt-6 border-t border-border pt-5">
+              <div className="flex items-center gap-2 mb-3 text-sm font-medium text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                Recent searches
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {recentSearches.map((recent) => (
+                  <button
+                    key={recent}
+                    onClick={() => runSearch(recent)}
+                    className="rounded-full bg-muted px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    {recent}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -409,6 +515,9 @@ function EmptyState({ query, lang }: { query: string; lang: "hi" | "hinglish" | 
     <div className="text-center py-16">
       <Search className="h-10 w-10 mx-auto text-muted-foreground/40 mb-4" />
       <p className="text-muted-foreground text-lg">{message}</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Try broader words like mercy, prayer, patience, or forgiveness.
+      </p>
     </div>
   );
 }

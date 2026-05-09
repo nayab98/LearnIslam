@@ -11,11 +11,20 @@ import {
   Star,
   ArrowRight,
   CheckCircle,
+  BookmarkCheck,
+  ListChecks,
+  RotateCcw,
 } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { useArabicFont } from "@/lib/useArabicFont";
 import { CURATED_HADITHS } from "@/lib/hadiths";
+import { fetchDailyVerse, type DailyVerseResult } from "@/lib/quran-api";
+import { cleanArabicTextForDisplay } from "@/lib/quran-text";
+import { getBookmarks, type Bookmark } from "@/lib/bookmarks";
+import { getDueReviewItems, getLastReadPosition, getTodayEventCounts } from "@/lib/learning-events";
+import { createClient } from "@/lib/supabase/client";
+import { SourceTrust } from "@/components/common/SourceTrust";
 
 function getDayOfYear() {
   const now = new Date();
@@ -24,47 +33,65 @@ function getDayOfYear() {
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
-interface DailyVerse {
-  arabic: string;
-  translation: string;
-  surahName: string;
-  ayahNumber: number;
-}
-
 export default function HomePage() {
   const { lang } = useLanguage();
   const arabicFont = useArabicFont();
-  const [verse, setVerse] = useState<DailyVerse | null>(null);
+  const [verse, setVerse] = useState<DailyVerseResult | null>(null);
   const [verseLoading, setVerseLoading] = useState(true);
+  const [homeProgress, setHomeProgress] = useState<{
+    today: Awaited<ReturnType<typeof getTodayEventCounts>>;
+    lastRead: Awaited<ReturnType<typeof getLastReadPosition>>;
+    dueReviewCount: number;
+    bookmarks: Bookmark[];
+  } | null>(null);
 
   const dayOfYear = getDayOfYear();
   const dailyHadith = CURATED_HADITHS[dayOfYear % CURATED_HADITHS.length];
 
   useEffect(() => {
     const ayahNumber = (dayOfYear % 6236) + 1;
-    const controller = new AbortController();
+    let mounted = true;
 
-    Promise.all([
-      fetch(`https://api.alquran.cloud/v1/ayah/${ayahNumber}`, { signal: controller.signal }),
-      fetch(`https://api.alquran.cloud/v1/ayah/${ayahNumber}/en.asad`, { signal: controller.signal }),
-    ])
-      .then(async ([arRes, enRes]) => {
-        const arData = await arRes.json();
-        const enData = await enRes.json();
-        if (arData.data && enData.data) {
-          setVerse({
-            arabic: arData.data.text,
-            translation: enData.data.text,
-            surahName: arData.data.surah.englishName,
-            ayahNumber: arData.data.numberInSurah,
-          });
-        }
+    fetchDailyVerse(ayahNumber)
+      .then((dailyVerse) => {
+        if (mounted) setVerse(dailyVerse);
       })
       .catch(() => {})
-      .finally(() => setVerseLoading(false));
+      .finally(() => {
+        if (mounted) setVerseLoading(false);
+      });
 
-    return () => controller.abort();
+    return () => {
+      mounted = false;
+    };
   }, [dayOfYear]);
+
+  useEffect(() => {
+    let mounted = true;
+    const supabase = createClient();
+
+    supabase.auth.getUser().then(async ({ data }) => {
+      const id = data.user?.id || null;
+      const [today, lastRead, dueReview, bookmarks] = await Promise.all([
+        getTodayEventCounts(id),
+        getLastReadPosition(id),
+        getDueReviewItems(id, 5),
+        getBookmarks(id),
+      ]);
+      if (mounted) {
+        setHomeProgress({
+          today,
+          lastRead,
+          dueReviewCount: dueReview.length,
+          bookmarks,
+        });
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const features = [
     {
@@ -138,6 +165,47 @@ export default function HomePage() {
     { value: "30", labelKey: "stat_paare" },
   ];
 
+  const today = homeProgress?.today ?? {
+    ayah_read: 0,
+    word_reviewed: 0,
+    dua_read: 0,
+    hadith_read: 0,
+    quiz_answered: 0,
+  };
+  const pathItems = [
+    {
+      icon: BookmarkCheck,
+      title: t("continue_reading", lang),
+      desc: homeProgress?.lastRead
+        ? `Surah ${homeProgress.lastRead.surah_id}, Ayah ${homeProgress.lastRead.ayah_id}`
+        : t("choose_surah_to_begin", lang),
+      href: homeProgress?.lastRead
+        ? `/surahs/${homeProgress.lastRead.surah_id}#ayah-${homeProgress.lastRead.ayah_id}`
+        : "/surahs",
+      progress: Math.min(today.ayah_read, 5),
+      target: 5,
+      color: "text-emerald-600",
+    },
+    {
+      icon: RotateCcw,
+      title: t("review_queue", lang),
+      desc: `${homeProgress?.dueReviewCount ?? 0} ${t("due_items", lang)}`,
+      href: "/lafz-ba-lafz/easy",
+      progress: Math.min(today.word_reviewed, 5),
+      target: 5,
+      color: "text-purple-600",
+    },
+    {
+      icon: ListChecks,
+      title: t("daily_plan", lang),
+      desc: `${Math.min(today.dua_read, 1) + Math.min(today.hadith_read, 1) + Math.min(today.quiz_answered, 1)} / 3 essentials`,
+      href: "/dashboard",
+      progress: Math.min(today.dua_read, 1) + Math.min(today.hadith_read, 1) + Math.min(today.quiz_answered, 1),
+      target: 3,
+      color: "text-amber-600",
+    },
+  ];
+
   return (
     <div className="flex flex-col">
       {/* Hero Section */}
@@ -206,6 +274,64 @@ export default function HomePage() {
       {/* Daily Verse + Hadith + Quick Links */}
       <section className="py-16 bg-background">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-14">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between mb-5">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  Today&apos;s Path
+                </p>
+                <h2 className="text-2xl sm:text-3xl font-bold">Continue with one clear step</h2>
+              </div>
+              <Link
+                href="/bookmarks"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
+              >
+                Saved items ({homeProgress?.bookmarks.length ?? 0})
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {pathItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.title}
+                    href={item.href}
+                    className="rounded-2xl border border-border bg-card p-5 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-xl bg-muted p-2">
+                        <Icon className={`h-5 w-5 ${item.color}`} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold">{item.title}</p>
+                        <p className="text-sm text-muted-foreground mt-1 truncate">{item.desc}</p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">
+                        {item.progress}/{item.target}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+            {homeProgress?.bookmarks && homeProgress.bookmarks.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {homeProgress.bookmarks.slice(0, 3).map((bookmark) => (
+                  <Link
+                    key={`${bookmark.item_type}-${bookmark.item_id}`}
+                    href={bookmark.href || "/bookmarks"}
+                    className="max-w-full rounded-full border border-border bg-muted/40 px-3 py-1 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <span className="font-medium capitalize">{bookmark.item_type}</span>
+                    <span className="mx-1">·</span>
+                    <span className="inline-block max-w-[14rem] truncate align-bottom">{bookmark.title}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-10">
             {t("daily_section_title", lang)}
           </h2>
@@ -230,6 +356,14 @@ export default function HomePage() {
                     <p className="text-xs opacity-60">
                       — {verse.surahName}, Ayah {verse.ayahNumber}
                     </p>
+                    <SourceTrust
+                      compact
+                      className="mt-4 [&>span]:border-white/20 [&>span]:bg-white/15 [&>span]:text-white/85 [&_span]:text-white/90"
+                      items={[
+                        { label: "Arabic", value: verse.source },
+                        { label: "Translation", value: "Sahih International" },
+                      ]}
+                    />
                   </>
                 ) : (
                   <p className="text-white/70 text-sm">{t("daily_verse_error", lang)}</p>
@@ -242,7 +376,7 @@ export default function HomePage() {
                   📜 {t("daily_hadith_title", lang)}
                 </h3>
                 <p className={`text-2xl sm:text-3xl ${arabicFont} leading-loose mb-4 text-right`}>
-                  {dailyHadith.arabic_text}
+                  {cleanArabicTextForDisplay(dailyHadith.arabic_text)}
                 </p>
                 <p className="text-sm sm:text-base opacity-90 leading-relaxed mb-3">
                   &ldquo;{dailyHadith.english_text}&rdquo;
@@ -250,6 +384,17 @@ export default function HomePage() {
                 <p className="text-xs opacity-60">
                   — {dailyHadith.narrator_en} | {dailyHadith.collection.charAt(0).toUpperCase() + dailyHadith.collection.slice(1)} #{dailyHadith.hadith_number}
                 </p>
+                <SourceTrust
+                  compact
+                  className="mt-4 [&>span]:border-white/20 [&>span]:bg-white/15 [&>span]:text-white/85 [&_span]:text-white/90"
+                  items={[
+                    {
+                      label: "Hadith",
+                      value: `${dailyHadith.collection.replace("_", " ")} #${dailyHadith.hadith_number}`,
+                    },
+                    { label: "Grade", value: dailyHadith.grade.toUpperCase() },
+                  ]}
+                />
               </div>
             </div>
 

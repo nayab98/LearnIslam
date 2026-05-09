@@ -14,6 +14,14 @@ export function cleanQuranText(text: string) {
     .trim();
 }
 
+export function cleanArabicTextForDisplay(text: string) {
+  return text
+    .replace(UNSUPPORTED_QURAN_SIGNS, "")
+    .replace(DIRECTIONAL_FORMATTING, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function arabicSkeleton(text: string) {
   return cleanQuranText(text)
     .replace(TATWEEL, "")

@@ -8,6 +8,8 @@ import { CheckCircle, XCircle, ArrowRight, Trophy, RefreshCw, Loader2 } from "lu
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { saveGenericQuizAttempt } from "@/lib/user-data";
+import { cleanArabicTextForDisplay } from "@/lib/quran-text";
+import { SourceTrust } from "@/components/common/SourceTrust";
 
 interface QuizQuestion {
   id: string;
@@ -259,12 +261,18 @@ export default function WordMeaningQuiz({ difficulty }: Props) {
             ? "इस शब्द का क्या अर्थ है?"
             : "Is lafz ka kya matlab hai?"}
         </p>
-        <p className="text-5xl font-arabic text-center leading-[2] text-foreground">
-          {current.arabic}
+        <p className="text-5xl font-arabic text-center leading-[2] text-foreground break-words" dir="rtl">
+          {cleanArabicTextForDisplay(current.arabic)}
         </p>
         <p className="text-lg text-muted-foreground text-center mt-2 italic">
           {current.transliteration}
         </p>
+        <SourceTrust
+          compact
+          className="mt-4 justify-center"
+          reviewStatus="needs_review"
+          items={[{ label: "Source", value: "Curated vocabulary list" }]}
+        />
       </div>
 
       {/* Options */}

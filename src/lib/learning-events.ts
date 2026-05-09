@@ -11,8 +11,16 @@ import {
 const LAST_READ_KEY = "learnislam_last_read";
 const LOCAL_BADGES_KEY = "learnislam_badges";
 const LOCAL_REVIEW_KEY = "learnislam_review_items";
+const LOCAL_EVENTS_KEY = "learnislam_learning_events";
 
 type EventMetadata = Record<string, unknown>;
+type LocalLearningEvent = {
+  event_type: LearningEventType;
+  item_type: LearnItemType;
+  item_id: string;
+  metadata: EventMetadata;
+  created_at: string;
+};
 
 function todayIsoDate() {
   return new Date().toISOString().split("T")[0];
@@ -37,6 +45,29 @@ function writeJson<T>(key: string, value: T) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+function recordLocalEvent(event: LocalLearningEvent) {
+  const events = readJson<LocalLearningEvent[]>(LOCAL_EVENTS_KEY, []);
+  writeJson(LOCAL_EVENTS_KEY, [event, ...events].slice(0, 300));
+}
+
+function getLocalTodayEventCounts() {
+  const fallback = {
+    ayah_read: 0,
+    word_reviewed: 0,
+    dua_read: 0,
+    hadith_read: 0,
+    quiz_answered: 0,
+  };
+  const today = todayIsoDate();
+
+  return readJson<LocalLearningEvent[]>(LOCAL_EVENTS_KEY, []).reduce((acc, event) => {
+    if (!event.created_at.startsWith(today)) return acc;
+    const key = event.event_type as keyof typeof fallback;
+    if (key in acc) acc[key] += 1;
+    return acc;
+  }, { ...fallback });
+}
+
 export async function recordLearningEvent(params: {
   userId: string | null;
   eventType: LearningEventType;
@@ -44,6 +75,15 @@ export async function recordLearningEvent(params: {
   itemId: string;
   metadata?: EventMetadata;
 }) {
+  const localEvent: LocalLearningEvent = {
+    event_type: params.eventType,
+    item_type: params.itemType,
+    item_id: params.itemId,
+    metadata: params.metadata || {},
+    created_at: new Date().toISOString(),
+  };
+  recordLocalEvent(localEvent);
+
   if (!params.userId) return;
 
   try {
@@ -60,7 +100,7 @@ export async function recordLearningEvent(params: {
   }
 }
 
-export async function getTodayEventCounts(userId: string) {
+export async function getTodayEventCounts(userId?: string | null) {
   const fallback = {
     ayah_read: 0,
     word_reviewed: 0,
@@ -68,6 +108,8 @@ export async function getTodayEventCounts(userId: string) {
     hadith_read: 0,
     quiz_answered: 0,
   };
+
+  if (!userId) return getLocalTodayEventCounts();
 
   try {
     const supabase = createClient();
@@ -78,7 +120,7 @@ export async function getTodayEventCounts(userId: string) {
       .eq("user_id", userId)
       .gte("created_at", since);
 
-    if (error || !data) return fallback;
+    if (error || !data) return getLocalTodayEventCounts();
 
     return data.reduce((acc, event) => {
       const key = event.event_type as keyof typeof fallback;
@@ -86,7 +128,7 @@ export async function getTodayEventCounts(userId: string) {
       return acc;
     }, { ...fallback });
   } catch {
-    return fallback;
+    return getLocalTodayEventCounts();
   }
 }
 
@@ -274,4 +316,3 @@ export async function getDueReviewItems(userId?: string | null, limit = 5): Prom
     .filter((item) => item.next_due_at <= now)
     .slice(0, limit);
 }
-

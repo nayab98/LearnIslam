@@ -9,6 +9,8 @@ import { DUAS, DUA_CATEGORIES, type Dua } from "@/lib/duas";
 import { addBookmark, getBookmarks, removeBookmark } from "@/lib/bookmarks";
 import { recordLearningEvent } from "@/lib/learning-events";
 import { createClient } from "@/lib/supabase/client";
+import { cleanArabicTextForDisplay } from "@/lib/quran-text";
+import { SourceTrust } from "@/components/common/SourceTrust";
 
 const CATEGORY_KEYS: Record<string, string> = {
   All: "dua_category_all",
@@ -103,16 +105,16 @@ export default function DuasPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <div className="mx-auto w-full max-w-5xl min-w-0 overflow-x-hidden px-4 sm:px-6 lg:px-8 py-10">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
+      <div className="mb-8 min-w-0">
+        <div className="flex min-w-0 items-center gap-3 mb-3">
+          <div className="shrink-0 p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
             <BookHeart className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <h1 className="text-3xl font-bold">{t("duas_title", lang)}</h1>
+          <h1 className="min-w-0 text-3xl font-bold break-words">{t("duas_title", lang)}</h1>
         </div>
-        <p className="text-muted-foreground text-lg max-w-2xl">
+        <p className="w-full max-w-2xl text-muted-foreground text-lg break-words [overflow-wrap:anywhere]">
           {t("duas_subtitle", lang)}
         </p>
       </div>
@@ -130,7 +132,8 @@ export default function DuasPage() {
       </div>
 
       {/* Category tabs */}
-      <div className="flex flex-wrap gap-2 mb-8">
+      <div className="mb-8 w-full overflow-x-auto">
+        <div className="flex w-max max-w-none gap-2 sm:w-auto sm:flex-wrap">
         {["All", ...DUA_CATEGORIES].map((cat) => {
           const count =
             cat === "All"
@@ -140,7 +143,7 @@ export default function DuasPage() {
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+              className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
                 activeCategory === cat
                   ? "bg-emerald-600 text-white shadow-md"
                   : "bg-card border border-border text-muted-foreground hover:border-emerald-400 hover:text-emerald-600"
@@ -151,6 +154,7 @@ export default function DuasPage() {
             </button>
           );
         })}
+        </div>
       </div>
 
       {/* Dua count */}
@@ -164,46 +168,51 @@ export default function DuasPage() {
           <div
             key={dua.id}
             id={`dua-${dua.id}`}
-            className="group rounded-2xl border border-border bg-card p-5 sm:p-6 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-lg transition-all"
+            className="group w-full min-w-0 overflow-hidden rounded-2xl border border-border bg-card p-5 sm:p-6 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-lg transition-all"
           >
             {/* Category + Reference badges */}
-            <div className="flex flex-wrap items-center gap-2 mb-4">
-              <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
-                {categoryLabel(dua.category)}
-              </span>
-              <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
-                {dua.reference}
-              </span>
-              <button
-                onClick={() => toggleBookmark(dua)}
-                className="ml-auto p-1.5 rounded-lg text-muted-foreground hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
-                title={t("bookmark", lang)}
-              >
-                <Heart className={`h-4 w-4 ${bookmarkedDuas.has(String(dua.id)) ? "fill-pink-500 text-pink-500" : ""}`} />
-              </button>
-              <button
-                onClick={() => markRead(dua)}
-                className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border transition-colors ${
-                  readDuas.has(dua.id)
-                    ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
-                    : "border-border text-muted-foreground hover:bg-accent"
-                }`}
-              >
-                <Check className="h-3 w-3" />
-                {readDuas.has(dua.id) ? t("padha", lang) : t("mark_read", lang)}
-              </button>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className="max-w-full break-words text-xs font-medium px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                  {categoryLabel(dua.category)}
+                </span>
+                <span className="max-w-full break-words text-xs font-medium px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+                  {dua.reference}
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  onClick={() => toggleBookmark(dua)}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
+                  title={t("bookmark", lang)}
+                  aria-label={t("bookmark", lang)}
+                >
+                  <Heart className={`h-4 w-4 ${bookmarkedDuas.has(String(dua.id)) ? "fill-pink-500 text-pink-500" : ""}`} />
+                </button>
+                <button
+                  onClick={() => markRead(dua)}
+                  className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                    readDuas.has(dua.id)
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+                      : "border-border text-muted-foreground hover:bg-accent"
+                  }`}
+                >
+                  <Check className="h-3 w-3" />
+                  <span className="whitespace-nowrap">{readDuas.has(dua.id) ? t("padha", lang) : t("mark_read", lang)}</span>
+                </button>
+              </div>
             </div>
 
             {/* Arabic */}
             <p
-              className={`${arabicFont} text-2xl sm:text-3xl leading-loose text-right mb-4 text-foreground`}
+              className={`${arabicFont} max-w-full overflow-hidden break-words [overflow-wrap:anywhere] text-2xl sm:text-3xl leading-loose text-right mb-4 text-foreground`}
               dir="rtl"
             >
-              {dua.arabic}
+              {cleanArabicTextForDisplay(dua.arabic)}
             </p>
 
             {/* Transliteration */}
-            <p className="text-sm italic text-muted-foreground mb-3 leading-relaxed">
+            <p className="text-sm italic text-muted-foreground mb-3 leading-relaxed break-words [overflow-wrap:anywhere]">
               {dua.transliteration}
             </p>
 
@@ -211,7 +220,7 @@ export default function DuasPage() {
             <div className="border-t border-border my-3" />
 
             {/* Meaning in selected language */}
-            <p className="text-base leading-relaxed text-foreground">
+            <p className="text-base leading-relaxed text-foreground break-words [overflow-wrap:anywhere]">
               {meaningForLang(dua)}
             </p>
 
@@ -221,6 +230,14 @@ export default function DuasPage() {
                 {dua.meaning_en}
               </p>
             )}
+
+            <SourceTrust
+              className="mt-4"
+              items={[
+                { label: "Reference", value: dua.reference },
+                { label: "Content", value: "Curated dua collection" },
+              ]}
+            />
           </div>
         ))}
 

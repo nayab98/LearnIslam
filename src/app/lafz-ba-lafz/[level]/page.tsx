@@ -10,6 +10,8 @@ import { t } from "@/lib/translations";
 import { WORD_LEVELS, ArabicWord } from "@/lib/arabic-words";
 import { createClient } from "@/lib/supabase/client";
 import { recordLearningEvent, upsertReviewItem } from "@/lib/learning-events";
+import { cleanArabicTextForDisplay } from "@/lib/quran-text";
+import { SourceTrust } from "@/components/common/SourceTrust";
 
 const VALID_LEVELS = ["easy", "medium", "hard"] as const;
 type Level = (typeof VALID_LEVELS)[number];
@@ -102,7 +104,7 @@ export default function LafzBaLafzLevelPage() {
               {!isFlipped ? (
                 <div className="flex flex-col items-center gap-3 min-h-[100px] justify-center">
                   <span className="font-arabic text-3xl leading-relaxed" dir="rtl">
-                    {word.arabic}
+                    {cleanArabicTextForDisplay(word.arabic)}
                   </span>
                   <span className="text-xs italic text-muted-foreground">
                     {word.transliteration}
@@ -111,7 +113,7 @@ export default function LafzBaLafzLevelPage() {
               ) : (
                 <div className="flex flex-col items-center gap-2 min-h-[100px] justify-center">
                   <span className="font-arabic text-xl text-muted-foreground" dir="rtl">
-                    {word.arabic}
+                    {cleanArabicTextForDisplay(word.arabic)}
                   </span>
                   <span className="text-base font-semibold text-center leading-snug">
                     {meaning}
@@ -121,6 +123,12 @@ export default function LafzBaLafzLevelPage() {
                       {word.meaning_en}
                     </span>
                   )}
+                  <SourceTrust
+                    compact
+                    className="mt-2 justify-center"
+                    reviewStatus="needs_review"
+                    items={[{ label: "Source", value: "Curated vocabulary list" }]}
+                  />
                 </div>
               )}
             </button>

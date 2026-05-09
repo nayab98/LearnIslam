@@ -10,6 +10,8 @@ import { CheckCircle, XCircle, ArrowRight, Trophy, RefreshCw, Loader2 } from "lu
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { saveGenericQuizAttempt } from "@/lib/user-data";
+import { cleanQuranText } from "@/lib/quran-text";
+import { SourceTrust } from "@/components/common/SourceTrust";
 
 interface Props {
   difficulty: "easy" | "medium" | "hard";
@@ -314,12 +316,16 @@ export default function AyahCompletionQuiz({ difficulty }: Props) {
             ? "Aayat poori karein — chhoote hue lafz chunein:"
             : "Complete the ayah — pick the missing word(s):"}
         </p>
-        <p className="text-3xl sm:text-4xl font-arabic text-center leading-[2] text-foreground" dir="rtl">
-          {current.partialText}
+        <p className="text-3xl sm:text-4xl font-arabic text-center leading-[2] text-foreground break-words" dir="rtl">
+          {cleanQuranText(current.partialText)}
         </p>
         <p className="text-xs text-muted-foreground text-center mt-3">
           {current.surahName} — {t("ayatein", lang)} {current.ayahNumber}
         </p>
+        <SourceTrust
+          className="mt-4 justify-center"
+          items={[{ label: "Arabic text", value: "Quran.com IndoPak text" }]}
+        />
       </div>
 
       {/* Options */}
@@ -347,7 +353,7 @@ export default function AyahCompletionQuiz({ difficulty }: Props) {
                 <span className="shrink-0 w-6 h-6 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold font-sans">
                   {String.fromCharCode(65 + idx)}
                 </span>
-                <span className="flex-1">{option}</span>
+                <span className="flex-1">{cleanQuranText(option)}</span>
                 {selected !== null && idx === current.correctIdx && (
                   <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
                 )}
@@ -382,7 +388,7 @@ export default function AyahCompletionQuiz({ difficulty }: Props) {
             <p className="text-sm text-muted-foreground mt-1">
               {t("correct_was", lang)}{" "}
               <span className="font-medium text-foreground font-arabic">
-                {current.missingWords}
+                {cleanQuranText(current.missingWords)}
               </span>
             </p>
           )}

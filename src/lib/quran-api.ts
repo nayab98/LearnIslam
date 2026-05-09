@@ -18,6 +18,19 @@ interface QuranComVerseResponse {
   };
 }
 
+interface QuranComVerseByKeyResponse {
+  verse?: QuranComVerse;
+}
+
+export interface DailyVerseResult {
+  arabic: string;
+  translation: string;
+  surahName: string;
+  surahNumber: number;
+  ayahNumber: number;
+  source: string;
+}
+
 // English meaning/translation for all 114 Surahs
 const ENGLISH_TRANSLATIONS: Record<number, string> = {
   1: "The Opening",
@@ -299,6 +312,46 @@ async function fetchIndoPakAyahText(surahNumber: number) {
     if (!nextPage || nextPage === page) return ayahText;
     page = nextPage;
   }
+}
+
+export async function fetchDailyVerse(globalAyahNumber: number): Promise<DailyVerseResult> {
+  const [arabicRes, englishRes] = await Promise.all([
+    fetch(`${BASE_URL}/ayah/${globalAyahNumber}`, { next: { revalidate: 86400 } }),
+    fetch(`${BASE_URL}/ayah/${globalAyahNumber}/en.sahih`, { next: { revalidate: 86400 } }),
+  ]);
+
+  if (!arabicRes.ok || !englishRes.ok) throw new Error("Failed to fetch daily verse");
+
+  const [arabicData, englishData] = await Promise.all([arabicRes.json(), englishRes.json()]);
+  const ayah = arabicData?.data;
+  const translation = englishData?.data?.text || "";
+  const surahNumber = Number(ayah?.surah?.number);
+  const ayahNumber = Number(ayah?.numberInSurah);
+
+  if (!surahNumber || !ayahNumber) throw new Error("Invalid daily verse response");
+
+  let indopakText = "";
+  try {
+    const params = new URLSearchParams({ fields: "text_indopak" });
+    const res = await fetch(`${QURAN_COM_BASE}/verses/by_key/${surahNumber}:${ayahNumber}?${params}`, {
+      next: { revalidate: 86400 },
+    });
+    if (res.ok) {
+      const data = (await res.json()) as QuranComVerseByKeyResponse;
+      indopakText = data.verse?.text_indopak || "";
+    }
+  } catch {
+    // Al Quran Cloud text below remains the fallback.
+  }
+
+  return {
+    arabic: cleanAyahTextForDisplay(indopakText || String(ayah.text || ""), surahNumber, ayahNumber),
+    translation,
+    surahName: ayah.surah.englishName,
+    surahNumber,
+    ayahNumber,
+    source: indopakText ? "Quran.com IndoPak text" : "Al Quran Cloud Arabic fallback",
+  };
 }
 
 export async function fetchSurahDetail(surahNumber: number): Promise<SurahDetail> {

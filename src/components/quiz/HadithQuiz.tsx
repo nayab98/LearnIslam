@@ -8,6 +8,8 @@ import { CheckCircle, XCircle, ArrowRight, Trophy, RefreshCw, Loader2 } from "lu
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { saveGenericQuizAttempt } from "@/lib/user-data";
+import { cleanArabicTextForDisplay } from "@/lib/quran-text";
+import { SourceTrust } from "@/components/common/SourceTrust";
 
 interface QuizQuestion {
   id: number;
@@ -269,8 +271,8 @@ export default function HadithQuiz({ difficulty }: Props) {
 
       {/* Question card */}
       <div className="bg-card border border-border rounded-3xl p-8 mb-6">
-        <p className="text-3xl font-arabic text-center leading-[2] text-foreground mb-4">
-          {current.arabicText}
+        <p className="text-3xl font-arabic text-center leading-[2] text-foreground mb-4 break-words" dir="rtl">
+          {cleanArabicTextForDisplay(current.arabicText)}
         </p>
         <div className="border-t border-border pt-4">
           <p className="text-sm text-muted-foreground text-center mb-2">
@@ -283,6 +285,13 @@ export default function HadithQuiz({ difficulty }: Props) {
         <p className="text-xs text-muted-foreground text-center mt-4">
           {current.narrator} — {COLLECTION_LABELS[current.collection] || current.collection} #{current.hadithNumber}
         </p>
+        <SourceTrust
+          className="mt-4 justify-center"
+          items={[
+            { label: "Hadith", value: `${COLLECTION_LABELS[current.collection] || current.collection} #${current.hadithNumber}` },
+            { label: "Narrator", value: current.narrator },
+          ]}
+        />
       </div>
 
       {/* Options */}

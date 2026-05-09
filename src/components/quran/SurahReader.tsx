@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Surah, Ayah } from "@/types";
-import { Play, Pause, Volume2, VolumeX, BookOpen, Check, Bookmark, LogIn, Paintbrush, Heart, MessageCircle, BookOpenText, Loader2, ChevronDown, ChevronUp, Send, Trash2 } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, BookOpen, Check, Bookmark, LogIn, Paintbrush, Heart, MessageCircle, BookOpenText, Loader2, ChevronDown, ChevronUp, Send, Trash2, Settings2, Type } from "lucide-react";
 import { getSurahAudioUrl } from "@/lib/quran-api";
 import WordByWordAyah from "./WordByWordAyah";
 import TajweedText from "./TajweedText";
@@ -13,8 +13,9 @@ import { t } from "@/lib/translations";
 import { useArabicFont } from "@/lib/useArabicFont";
 import { addBookmark, getBookmarks, removeBookmark } from "@/lib/bookmarks";
 import { addUserComment, deleteUserComment, getCommentsForUser, Comment } from "@/lib/comments";
-import { setLastReadPosition } from "@/lib/learning-events";
+import { recordLearningEvent, setLastReadPosition } from "@/lib/learning-events";
 import { CANONICAL_BISMILLAH, cleanAyahTextForDisplay } from "@/lib/quran-text";
+import { SourceTrust } from "@/components/common/SourceTrust";
 
 interface SurahReaderProps {
   surah: Surah;
@@ -22,12 +23,33 @@ interface SurahReaderProps {
 }
 
 type ReaderMode = "study" | "flow";
+type ArabicFontSize = "sm" | "md" | "lg";
+type ReaderLineSpacing = "compact" | "comfortable" | "spacious";
+
+const READER_SETTINGS_KEY = "learnislam_reader_settings";
+const FONT_SIZE_CLASSES: Record<ArabicFontSize, string> = {
+  sm: "text-[1.875rem] sm:text-[2.25rem] md:text-[2.5rem]",
+  md: "text-[2.25rem] sm:text-[2.75rem] md:text-[3rem]",
+  lg: "text-[2.6rem] sm:text-[3.15rem] md:text-[3.4rem]",
+};
+const FLOW_FONT_SIZE_CLASSES: Record<ArabicFontSize, string> = {
+  sm: "text-[1.75rem] sm:text-[2.15rem] md:text-[2.35rem]",
+  md: "text-[2rem] sm:text-[2.5rem] md:text-[2.8rem]",
+  lg: "text-[2.35rem] sm:text-[2.9rem] md:text-[3.15rem]",
+};
+const LINE_HEIGHT_CLASSES: Record<ReaderLineSpacing, string> = {
+  compact: "leading-[2.05]",
+  comfortable: "leading-[2.55]",
+  spacious: "leading-[3]",
+};
 
 export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
   const { lang } = useLanguage();
   const arabicFont = useArabicFont();
   const [showTranslation, setShowTranslation] = useState(true);
   const [readerMode, setReaderMode] = useState<ReaderMode>("study");
+  const [arabicFontSize, setArabicFontSize] = useState<ArabicFontSize>("md");
+  const [lineSpacing, setLineSpacing] = useState<ReaderLineSpacing>("comfortable");
   const [wordByWordMode, setWordByWordMode] = useState(false);
   const [tajweedMode, setTajweedMode] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -52,11 +74,44 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
       if (data.user) setUserId(data.user.id);
     });
 
-    const savedReaderMode = localStorage.getItem("learnislam_reader_mode");
-    if (savedReaderMode === "study" || savedReaderMode === "flow") {
-      setReaderMode(savedReaderMode);
+    const savedSettings = localStorage.getItem(READER_SETTINGS_KEY);
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings) as {
+          readerMode?: ReaderMode;
+          showTranslation?: boolean;
+          arabicFontSize?: ArabicFontSize;
+          lineSpacing?: ReaderLineSpacing;
+        };
+        if (parsed.readerMode === "study" || parsed.readerMode === "flow") setReaderMode(parsed.readerMode);
+        if (typeof parsed.showTranslation === "boolean") setShowTranslation(parsed.showTranslation);
+        if (parsed.arabicFontSize === "sm" || parsed.arabicFontSize === "md" || parsed.arabicFontSize === "lg") {
+          setArabicFontSize(parsed.arabicFontSize);
+        }
+        if (
+          parsed.lineSpacing === "compact" ||
+          parsed.lineSpacing === "comfortable" ||
+          parsed.lineSpacing === "spacious"
+        ) {
+          setLineSpacing(parsed.lineSpacing);
+        }
+      } catch {
+        // Fall back to older mode-only preference.
+      }
+    } else {
+      const savedReaderMode = localStorage.getItem("learnislam_reader_mode");
+      if (savedReaderMode === "study" || savedReaderMode === "flow") {
+        setReaderMode(savedReaderMode);
+      }
     }
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(
+      READER_SETTINGS_KEY,
+      JSON.stringify({ readerMode, showTranslation, arabicFontSize, lineSpacing })
+    );
+  }, [readerMode, showTranslation, arabicFontSize, lineSpacing]);
 
   useEffect(() => {
     if (!userId) return;
@@ -132,6 +187,13 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
     if (!userId) {
       setLoginToast(ayahNumber);
       await setLastReadPosition(null, { surah_id: surah.number, ayah_id: ayahNumber });
+      await recordLearningEvent({
+        userId: null,
+        eventType: "ayah_read",
+        itemType: "ayah",
+        itemId: `${surah.number}:${ayahNumber}`,
+        metadata: { surah_id: surah.number, ayah_id: ayahNumber },
+      });
       return;
     }
     await markAyahRead(userId, surah.number, ayahNumber);
@@ -271,6 +333,7 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
             onClick={toggleMute}
             className="p-2 rounded-xl border border-border hover:bg-accent transition-colors"
             title={isMuted ? "Unmute" : "Mute"}
+            aria-label={isMuted ? "Unmute audio" : "Mute audio"}
           >
             {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
           </button>
@@ -295,6 +358,48 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
               {mode === "study" ? t("reader_mode_study", lang) : t("reader_mode_flow", lang)}
             </button>
           ))}
+        </div>
+
+        <div className="h-6 w-px bg-border" />
+
+        {/* Reader settings */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <Settings2 className="h-3.5 w-3.5" />
+            Reader
+          </span>
+          <div className="flex items-center gap-1 rounded-xl border border-border p-1">
+            {(["sm", "md", "lg"] as const).map((size) => (
+              <button
+                key={size}
+                onClick={() => setArabicFontSize(size)}
+                className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
+                  arabicFontSize === size
+                    ? "bg-emerald-600 text-white"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`}
+                aria-label={`Set Arabic font size ${size}`}
+              >
+                <Type className="h-3 w-3" />
+                {size.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1 rounded-xl border border-border p-1">
+            {(["compact", "comfortable", "spacious"] as const).map((spacing) => (
+              <button
+                key={spacing}
+                onClick={() => setLineSpacing(spacing)}
+                className={`rounded-lg px-2 py-1 text-xs font-medium capitalize transition-colors ${
+                  lineSpacing === spacing
+                    ? "bg-emerald-600 text-white"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`}
+              >
+                {spacing}
+              </button>
+            ))}
+          </div>
         </div>
 
         {readerMode === "study" && (
@@ -336,11 +441,19 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
               }`}
             >
               <Paintbrush className="h-4 w-4" />
-              Tajweed {tajweedMode ? "OFF" : "ON"}
+              Tajweed: {tajweedMode ? "On" : "Off"}
             </button>
           </>
         )}
       </div>
+      <SourceTrust
+        className="mb-6"
+        items={[
+          { label: "Arabic text", value: "Quran.com IndoPak text" },
+          { label: "Translation", value: "Sahih International" },
+          { label: "Tafsir", value: "Tafsir Ibn Kathir via Quran.com" },
+        ]}
+      />
       {readerMode === "flow" ? (
         <div className="rounded-2xl border border-emerald-100 dark:border-emerald-900/40 bg-card mushaf-page p-6 sm:p-10">
           {surah.number !== 1 && surah.number !== 9 && (
@@ -349,7 +462,7 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
             </p>
           )}
           <div
-            className={`quran-arabic ${arabicFont} text-right text-[2rem] sm:text-[2.5rem] md:text-[2.8rem] leading-[2.45] text-foreground selection:bg-emerald-200`}
+            className={`quran-arabic ${arabicFont} text-right ${FLOW_FONT_SIZE_CLASSES[arabicFontSize]} ${LINE_HEIGHT_CLASSES[lineSpacing]} text-foreground selection:bg-emerald-200`}
             dir="rtl"
           >
             {ayahs.map((ayah) => {
@@ -483,7 +596,7 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
                     <TajweedText text={displayText} />
                   ) : (
                     <p
-                      className={`quran-arabic text-right text-[2.25rem] sm:text-[2.75rem] md:text-[3rem] ${arabicFont} leading-[2.55] text-foreground selection:bg-emerald-200`}
+                      className={`quran-arabic text-right ${FONT_SIZE_CLASSES[arabicFontSize]} ${arabicFont} ${LINE_HEIGHT_CLASSES[lineSpacing]} text-foreground selection:bg-emerald-200`}
                       dir="rtl"
                     >
                       {displayText}

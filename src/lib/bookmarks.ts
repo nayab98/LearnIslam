@@ -27,7 +27,10 @@ export function getBookmarkHref(itemType: string, itemId: string): string {
 export function getLocalBookmarks(): Bookmark[] {
   if (typeof window === "undefined") return [];
   const stored = localStorage.getItem(STORAGE_KEY);
-  return stored ? JSON.parse(stored) : [];
+  const bookmarks = stored ? (JSON.parse(stored) as Bookmark[]) : [];
+  return bookmarks.sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
 }
 
 export function addLocalBookmark(bookmark: Bookmark) {

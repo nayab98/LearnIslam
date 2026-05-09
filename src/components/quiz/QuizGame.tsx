@@ -10,6 +10,8 @@ import { t } from "@/lib/translations";
 import { Ayah } from "@/types";
 import { CheckCircle, XCircle, ArrowRight, Trophy, RefreshCw, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { cleanQuranText } from "@/lib/quran-text";
+import { SourceTrust } from "@/components/common/SourceTrust";
 
 interface QuizQuestion {
   surahId: number;
@@ -270,12 +272,19 @@ export default function QuizGame({ difficulty, surahRange, label }: Props) {
         <p className="text-sm text-muted-foreground mb-4 text-center">
           {t("quiz_prompt", lang)}
         </p>
-        <p className="text-4xl font-arabic text-center leading-[2] text-foreground">
-          {current.arabicText}
+        <p className="text-4xl font-arabic text-center leading-[2] text-foreground break-words" dir="rtl">
+          {cleanQuranText(current.arabicText)}
         </p>
         <p className="text-xs text-muted-foreground text-center mt-2">
           {current.surahName}
         </p>
+        <SourceTrust
+          className="mt-4 justify-center"
+          items={[
+            { label: "Arabic text", value: "Quran.com IndoPak text" },
+            { label: "Translation", value: "Sahih International" },
+          ]}
+        />
       </div>
 
       {/* Options */}

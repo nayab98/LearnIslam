@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -15,12 +15,17 @@ export const metadata: Metadata = {
     "Learn Quran, Hadith, Arabic, duas, prayer times, quizzes, and progress tracking in one structured learning app.",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#059669",
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={cn(inter.variable)} suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#059669" />
       </head>
       <body className="antialiased min-h-screen flex flex-col bg-background text-foreground">
         <LanguageProvider>

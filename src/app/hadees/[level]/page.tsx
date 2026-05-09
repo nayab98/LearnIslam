@@ -12,6 +12,8 @@ import { fetchHadithsPage, HadithRow } from "@/lib/hadith-api";
 import { createClient } from "@/lib/supabase/client";
 import { addBookmark, getBookmarks, removeBookmark } from "@/lib/bookmarks";
 import { recordLearningEvent } from "@/lib/learning-events";
+import { cleanArabicTextForDisplay } from "@/lib/quran-text";
+import { SourceTrust } from "@/components/common/SourceTrust";
 
 const VALID_LEVELS = ["easy", "medium", "hard"] as const;
 type Level = (typeof VALID_LEVELS)[number];
@@ -240,11 +242,12 @@ export default function HadeesLevelPage() {
                 id={`hadith-${h.id}`}
                 className="bg-card border border-border rounded-2xl p-6"
               >
-                <div className="flex justify-end gap-2 mb-3">
+                <div className="flex flex-wrap justify-end gap-2 mb-3">
                   <button
                     onClick={() => toggleBookmark(h)}
                     className="p-1.5 rounded-lg text-muted-foreground hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
                     title={t("bookmark", lang)}
+                    aria-label={t("bookmark", lang)}
                   >
                     <Heart className={`h-4 w-4 ${bookmarkedHadiths.has(String(h.id)) ? "fill-pink-500 text-pink-500" : ""}`} />
                   </button>
@@ -262,10 +265,10 @@ export default function HadeesLevelPage() {
                 </div>
                 {/* Arabic */}
                 <p
-                  className={`${arabicFont} text-2xl leading-loose text-right mb-4`}
+                  className={`${arabicFont} max-w-full overflow-hidden break-words text-2xl leading-loose text-right mb-4`}
                   dir="rtl"
                 >
-                  {h.arabic_text}
+                  {cleanArabicTextForDisplay(h.arabic_text)}
                 </p>
 
                 {/* Translation */}
@@ -283,10 +286,10 @@ export default function HadeesLevelPage() {
 
                 {/* Bottom row */}
                 <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-border">
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm text-muted-foreground break-words">
                     {h.narrator_en}
                   </span>
-                  <span className="ml-auto inline-flex items-center gap-1.5">
+                  <span className="sm:ml-auto inline-flex flex-wrap items-center gap-1.5">
                     <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                       {collectionLabel(h.collection)} #{h.hadith_number}
                     </span>
@@ -301,6 +304,14 @@ export default function HadeesLevelPage() {
                     </span>
                   </span>
                 </div>
+                <SourceTrust
+                  className="mt-3"
+                  items={[
+                    { label: "Hadith", value: `${collectionLabel(h.collection)} #${h.hadith_number}` },
+                    { label: "Grade", value: h.grade.toUpperCase() },
+                    { label: "Narrator", value: h.narrator_en },
+                  ]}
+                />
               </div>
             ))}
           </div>

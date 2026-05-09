@@ -17,6 +17,7 @@ import { t } from "@/lib/translations";
 import { HijriCalendar } from "@/components/layout/HijriCalendar";
 import { BADGES } from "@/lib/badges";
 import { getDueReviewItems, getEarnedBadgeIds, getLastReadPosition, getTodayEventCounts } from "@/lib/learning-events";
+import { getBookmarks, type Bookmark } from "@/lib/bookmarks";
 
 interface Stats {
   profile: UserProfile | null;
@@ -26,6 +27,7 @@ interface Stats {
   today: Awaited<ReturnType<typeof getTodayEventCounts>>;
   lastRead: LastReadPosition | null;
   dueReview: ReviewItem[];
+  bookmarks: Bookmark[];
 }
 
 function XPBar({ xp, level, lang }: { xp: number; level: number; lang: "hi" | "hinglish" | "en" }) {
@@ -61,14 +63,37 @@ export default function DashboardPage() {
 
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) {
+        const [today, lastRead, dueReview, badgeIds, bookmarks] = await Promise.all([
+          getTodayEventCounts(null),
+          getLastReadPosition(null),
+          getDueReviewItems(null, 5),
+          getEarnedBadgeIds(null),
+          getBookmarks(null),
+        ]);
+        setStats({
+          profile: null,
+          streak: null,
+          quiz: { total: 0, correct: 0, accuracy: 0 },
+          reading: {
+            readAyahs: 0,
+            memorizedAyahs: 0,
+            touchedSurahs: 0,
+            completedSurahs: 0,
+            totalAyahs: 6236,
+          },
+          today,
+          lastRead,
+          dueReview,
+          bookmarks,
+        });
         setIsLoggedIn(false);
-        setEarnedBadgeIds(await getEarnedBadgeIds(null));
+        setEarnedBadgeIds(badgeIds);
         setLoading(false);
         return;
       }
       setIsLoggedIn(true);
 
-      const [profile, streak, quiz, reading, today, lastRead, dueReview, badgeIds] = await Promise.all([
+      const [profile, streak, quiz, reading, today, lastRead, dueReview, badgeIds, bookmarks] = await Promise.all([
         getUserProfile(data.user.id),
         getUserStreak(data.user.id),
         getQuizStats(data.user.id),
@@ -77,9 +102,10 @@ export default function DashboardPage() {
         getLastReadPosition(data.user.id),
         getDueReviewItems(data.user.id, 5),
         getEarnedBadgeIds(data.user.id),
+        getBookmarks(data.user.id),
       ]);
 
-      setStats({ profile, streak, quiz, reading, today, lastRead, dueReview });
+      setStats({ profile, streak, quiz, reading, today, lastRead, dueReview, bookmarks });
       setEarnedBadgeIds(badgeIds);
       setLoading(false);
     });
@@ -280,7 +306,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Continue + review */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <Link
           href={stats?.lastRead ? `/surahs/${stats.lastRead.surah_id}#ayah-${stats.lastRead.ayah_id}` : "/surahs"}
           className="flex items-center gap-4 p-5 bg-card border border-border hover:border-emerald-400 rounded-2xl transition-colors"
@@ -307,7 +333,45 @@ export default function DashboardPage() {
             </div>
           </div>
         </Link>
+        <Link
+          href="/bookmarks"
+          className="flex items-center gap-4 p-5 bg-card border border-border hover:border-pink-400 rounded-2xl transition-colors"
+        >
+          <BookmarkCheck className="h-7 w-7 text-pink-600" />
+          <div className="min-w-0">
+            <div className="font-semibold">Saved items</div>
+            <div className="text-sm text-muted-foreground truncate">
+              {stats?.bookmarks.length || 0} bookmarks
+            </div>
+          </div>
+        </Link>
       </div>
+
+      {stats?.bookmarks && stats.bookmarks.length > 0 && (
+        <div className="bg-card border border-border rounded-2xl p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold">Recently saved</h3>
+            <Link href="/bookmarks" className="text-sm font-medium text-emerald-600 hover:underline">
+              View all
+            </Link>
+          </div>
+          <div className="space-y-2">
+            {stats.bookmarks.slice(0, 4).map((bookmark) => (
+              <Link
+                key={`${bookmark.item_type}-${bookmark.item_id}`}
+                href={bookmark.href || "/bookmarks"}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 hover:bg-accent transition-colors"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{bookmark.title}</p>
+                  <p className="text-xs capitalize text-muted-foreground">{bookmark.item_type}</p>
+                </div>
+                <span className="shrink-0 text-xs text-muted-foreground">{bookmark.item_id}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Surah progress bar */}
       <div className="bg-card border border-border rounded-2xl p-6 mb-6">
