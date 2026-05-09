@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { fetchWordByWord } from "@/lib/quran-api";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useArabicFont } from "@/lib/useArabicFont";
+import { cleanQuranText } from "@/lib/quran-text";
 
 interface Props {
   surahNumber: number;
@@ -23,6 +24,7 @@ export default function WordByWordAyah({ surahNumber, ayahNumber, arabicText }: 
   const [loading, setLoading] = useState(false);
   const [activeWord, setActiveWord] = useState<number | null>(null);
   const arabicFont = useArabicFont();
+  const displayArabicText = cleanQuranText(arabicText);
 
   useEffect(() => {
     setLoading(true);
@@ -34,7 +36,7 @@ export default function WordByWordAyah({ surahNumber, ayahNumber, arabicText }: 
   if (loading) {
     return (
       <p className={`quran-arabic text-right text-[2.25rem] sm:text-[2.75rem] md:text-[3rem] ${arabicFont} leading-[2.55] text-foreground animate-pulse`} dir="rtl">
-        {arabicText}
+        {displayArabicText}
       </p>
     );
   }
@@ -42,7 +44,7 @@ export default function WordByWordAyah({ surahNumber, ayahNumber, arabicText }: 
   if (!words || words.length === 0) {
     return (
       <p className={`quran-arabic text-right text-[2.25rem] sm:text-[2.75rem] md:text-[3rem] ${arabicFont} leading-[2.55] text-foreground`} dir="rtl">
-        {arabicText}
+        {displayArabicText}
       </p>
     );
   }
@@ -50,7 +52,7 @@ export default function WordByWordAyah({ surahNumber, ayahNumber, arabicText }: 
   return (
     <div className="flex flex-wrap-reverse gap-x-3 gap-y-5 justify-end quran-arabic" dir="rtl">
       {words
-        .filter((w) => w.char_type !== "end")
+        .filter((w) => w.char_type !== "end" && cleanQuranText(w.text).length > 0)
         .map((word, idx) => (
           <Tooltip key={idx}>
             <TooltipTrigger
@@ -64,7 +66,7 @@ export default function WordByWordAyah({ surahNumber, ayahNumber, arabicText }: 
                   : "hover:bg-accent"
               }`}
             >
-              <span className={`text-3xl ${arabicFont} leading-relaxed`}>{word.text}</span>
+              <span className={`text-3xl ${arabicFont} leading-relaxed`}>{cleanQuranText(word.text)}</span>
               {word.transliteration?.text && (
                 <span className="text-[10px] text-muted-foreground italic">
                   {word.transliteration.text}

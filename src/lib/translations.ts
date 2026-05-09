@@ -89,6 +89,8 @@ const translations: Record<string, Record<Lang, string>> = {
   padha: { hi: "पढ़ा", hinglish: "Padha", en: "Read" },
   mark_read: { hi: "पढ़ा मार्क करें", hinglish: "Padha Mark Karen", en: "Mark as Read" },
   login_to_save: { hi: "प्रगति सेव करने के लिए लॉग इन करें", hinglish: "Pragati save karne ke liye Log In karein", en: "Log in to save progress" },
+  reader_mode_study: { hi: "स्टडी", hinglish: "Study", en: "Study" },
+  reader_mode_flow: { hi: "लगातार", hinglish: "Flow", en: "Flow" },
 
   // QUIZ
   quiz_title: { hi: "क्विज़", hinglish: "Quiz", en: "Quiz" },

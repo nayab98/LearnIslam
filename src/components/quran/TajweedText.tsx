@@ -1,6 +1,7 @@
 "use client";
 
 import { useArabicFont } from "@/lib/useArabicFont";
+import { cleanQuranText } from "@/lib/quran-text";
 
 const TAJWEED_LEGEND = [
   { name: "Madd", label: "Stretch", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300", dot: "bg-orange-500" },
@@ -65,7 +66,7 @@ function tajweedClass(token: string, nextToken?: string) {
 
 export default function TajweedText({ text }: TajweedTextProps) {
   const arabicFont = useArabicFont();
-  const tokens = tokenizeArabic(text);
+  const tokens = tokenizeArabic(cleanQuranText(text));
 
   return (
     <div className="space-y-3">

@@ -14,16 +14,20 @@ import { useArabicFont } from "@/lib/useArabicFont";
 import { addBookmark, getBookmarks, removeBookmark } from "@/lib/bookmarks";
 import { addUserComment, deleteUserComment, getCommentsForUser, Comment } from "@/lib/comments";
 import { setLastReadPosition } from "@/lib/learning-events";
+import { CANONICAL_BISMILLAH, cleanAyahTextForDisplay } from "@/lib/quran-text";
 
 interface SurahReaderProps {
   surah: Surah;
   ayahs: Ayah[];
 }
 
+type ReaderMode = "study" | "flow";
+
 export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
   const { lang } = useLanguage();
   const arabicFont = useArabicFont();
   const [showTranslation, setShowTranslation] = useState(true);
+  const [readerMode, setReaderMode] = useState<ReaderMode>("study");
   const [wordByWordMode, setWordByWordMode] = useState(false);
   const [tajweedMode, setTajweedMode] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -47,6 +51,11 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) setUserId(data.user.id);
     });
+
+    const savedReaderMode = localStorage.getItem("learnislam_reader_mode");
+    if (savedReaderMode === "study" || savedReaderMode === "flow") {
+      setReaderMode(savedReaderMode);
+    }
   }, []);
 
   useEffect(() => {
@@ -114,6 +123,11 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
     setIsMuted(!isMuted);
   };
 
+  const handleReaderModeChange = (mode: ReaderMode) => {
+    setReaderMode(mode);
+    localStorage.setItem("learnislam_reader_mode", mode);
+  };
+
   const handleMarkRead = async (ayahNumber: number) => {
     if (!userId) {
       setLoginToast(ayahNumber);
@@ -155,7 +169,7 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
     } else {
       const title = ayah.translation
         ? ayah.translation.slice(0, 50)
-        : ayah.text.slice(0, 50);
+        : cleanAyahTextForDisplay(ayah.text, surah.number, ayah.numberInSurah).slice(0, 50);
       await addBookmark(userId, {
         item_type: "ayah",
         item_id: itemId,
@@ -264,55 +278,117 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
 
         <div className="h-6 w-px bg-border" />
 
-        {/* Translation toggle */}
-        <button
-          onClick={() => setShowTranslation(!showTranslation)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors border ${
-            showTranslation
-              ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"
-              : "border-border text-muted-foreground hover:bg-accent"
-          }`}
-        >
-          <BookOpen className="h-4 w-4" />
-          {showTranslation ? t("tarjuma_hide", lang) : t("tarjuma_show", lang)}
-        </button>
+        {/* Reader mode toggle */}
+        <div className="flex items-center gap-1 rounded-xl border border-border p-1">
+          {(["study", "flow"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => handleReaderModeChange(mode)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                readerMode === mode
+                  ? "bg-emerald-600 text-white"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+              aria-label={mode === "study" ? t("reader_mode_study", lang) : t("reader_mode_flow", lang)}
+            >
+              {mode === "study" ? <BookOpenText className="h-4 w-4" /> : <BookOpen className="h-4 w-4" />}
+              {mode === "study" ? t("reader_mode_study", lang) : t("reader_mode_flow", lang)}
+            </button>
+          ))}
+        </div>
 
-        {/* Word by word toggle */}
-        <button
-          onClick={() => setWordByWordMode(!wordByWordMode)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors border ${
-            wordByWordMode
-              ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800"
-              : "border-border text-muted-foreground hover:bg-accent"
-          }`}
-        >
-          ✦ {t("lafz_ba_lafz", lang)}
-        </button>
+        {readerMode === "study" && (
+          <>
+            <div className="h-6 w-px bg-border" />
 
-        {/* Tajweed toggle */}
-        <button
-          onClick={() => setTajweedMode(!tajweedMode)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors border ${
-            tajweedMode
-              ? "bg-pink-100 text-pink-700 border-pink-200 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-800"
-              : "border-border text-muted-foreground hover:bg-accent"
-          }`}
-        >
-          <Paintbrush className="h-4 w-4" />
-          Tajweed {tajweedMode ? "OFF" : "ON"}
-        </button>
+            {/* Translation toggle */}
+            <button
+              onClick={() => setShowTranslation(!showTranslation)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors border ${
+                showTranslation
+                  ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"
+                  : "border-border text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              <BookOpen className="h-4 w-4" />
+              {showTranslation ? t("tarjuma_hide", lang) : t("tarjuma_show", lang)}
+            </button>
+
+            {/* Word by word toggle */}
+            <button
+              onClick={() => setWordByWordMode(!wordByWordMode)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors border ${
+                wordByWordMode
+                  ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800"
+                  : "border-border text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              ✦ {t("lafz_ba_lafz", lang)}
+            </button>
+
+            {/* Tajweed toggle */}
+            <button
+              onClick={() => setTajweedMode(!tajweedMode)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors border ${
+                tajweedMode
+                  ? "bg-pink-100 text-pink-700 border-pink-200 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-800"
+                  : "border-border text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              <Paintbrush className="h-4 w-4" />
+              Tajweed {tajweedMode ? "OFF" : "ON"}
+            </button>
+          </>
+        )}
       </div>
+      {readerMode === "flow" ? (
+        <div className="rounded-2xl border border-emerald-100 dark:border-emerald-900/40 bg-card mushaf-page p-6 sm:p-10">
+          {surah.number !== 1 && surah.number !== 9 && (
+            <p className={`quran-arabic ${arabicFont} text-center text-3xl sm:text-4xl text-emerald-800 dark:text-emerald-200 leading-loose mb-8`}>
+              {CANONICAL_BISMILLAH}
+            </p>
+          )}
+          <div
+            className={`quran-arabic ${arabicFont} text-right text-[2rem] sm:text-[2.5rem] md:text-[2.8rem] leading-[2.45] text-foreground selection:bg-emerald-200`}
+            dir="rtl"
+          >
+            {ayahs.map((ayah) => {
+              const displayText = cleanAyahTextForDisplay(ayah.text, surah.number, ayah.numberInSurah);
+              const isActive = activeAyah === ayah.numberInSurah;
+
+              return (
+                <span
+                  key={ayah.numberInSurah}
+                  id={`ayah-${ayah.numberInSurah}`}
+                  onClick={() => handleActivateAyah(ayah.numberInSurah, isActive)}
+                  className={`inline cursor-pointer rounded-lg px-1 transition-colors ${
+                    isActive
+                      ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100"
+                      : "hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                  }`}
+                >
+                  {displayText}
+                  <span className="mx-2 inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-emerald-500/70 px-2 align-middle text-sm font-semibold leading-none text-emerald-700 dark:text-emerald-300">
+                    {ayah.numberInSurah}
+                  </span>{" "}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
       <div className="space-y-6">
         {/* Bismillah — shown as the first card for all surahs except Al-Fatiha (1, has it as Ayah 1) and At-Taubah (9, has none) */}
         {surah.number !== 1 && surah.number !== 9 && (
           <div className="text-center p-6 rounded-2xl border border-emerald-100 dark:border-emerald-900/40 bg-gradient-to-b from-emerald-50/60 to-transparent dark:from-emerald-950/20">
             <p className={`quran-arabic ${arabicFont} text-4xl sm:text-5xl text-emerald-800 dark:text-emerald-200 leading-loose`}>
-              بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ
+              {CANONICAL_BISMILLAH}
             </p>
             <p className="text-xs text-muted-foreground mt-2">In the name of Allah, the Most Gracious, the Most Merciful</p>
           </div>
         )}
         {ayahs.map((ayah) => {
+          const displayText = cleanAyahTextForDisplay(ayah.text, surah.number, ayah.numberInSurah);
           const isActive = activeAyah === ayah.numberInSurah;
           const isRead = readAyahs.has(ayah.numberInSurah);
           const tafsirKey = `${surah.number}:${ayah.numberInSurah}`;
@@ -401,16 +477,16 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
                     <WordByWordAyah
                       surahNumber={surah.number}
                       ayahNumber={ayah.numberInSurah}
-                      arabicText={ayah.text}
+                      arabicText={displayText}
                     />
                   ) : tajweedMode ? (
-                    <TajweedText text={ayah.text} />
+                    <TajweedText text={displayText} />
                   ) : (
                     <p
                       className={`quran-arabic text-right text-[2.25rem] sm:text-[2.75rem] md:text-[3rem] ${arabicFont} leading-[2.55] text-foreground selection:bg-emerald-200`}
                       dir="rtl"
                     >
-                      {ayah.text}
+                      {displayText}
                     </p>
                   )}
                 </div>
@@ -527,6 +603,7 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
           );
         })}
       </div>
+      )}
     </div>
   );
 }

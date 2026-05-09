@@ -1,8 +1,22 @@
 import { Surah, SurahDetail, Ayah } from "@/types";
 import { ENABLE_LOCALIZED_LANGUAGES } from "@/lib/feature-flags";
+import { cleanAyahTextForDisplay } from "@/lib/quran-text";
 
 const BASE_URL = "https://api.alquran.cloud/v1";
 const QURAN_COM_BASE = "https://api.quran.com/api/v4";
+
+interface QuranComVerse {
+  verse_number?: number;
+  verse_key?: string;
+  text_indopak?: string;
+}
+
+interface QuranComVerseResponse {
+  verses?: QuranComVerse[];
+  pagination?: {
+    next_page?: number | null;
+  };
+}
 
 // English meaning/translation for all 114 Surahs
 const ENGLISH_TRANSLATIONS: Record<number, string> = {
@@ -257,14 +271,45 @@ export async function fetchSurahList(): Promise<Surah[]> {
   }));
 }
 
+async function fetchIndoPakAyahText(surahNumber: number) {
+  const ayahText: Record<number, string> = {};
+  let page = 1;
+
+  while (true) {
+    const params = new URLSearchParams({
+      fields: "text_indopak",
+      per_page: "50",
+      page: String(page),
+    });
+    const res = await fetch(`${QURAN_COM_BASE}/verses/by_chapter/${surahNumber}?${params}`, {
+      next: { revalidate: 86400 },
+    });
+
+    if (!res.ok) return ayahText;
+
+    const data = (await res.json()) as QuranComVerseResponse;
+    for (const verse of data.verses || []) {
+      const verseNumber = verse.verse_number || Number(verse.verse_key?.split(":")[1]);
+      if (verseNumber && verse.text_indopak) {
+        ayahText[verseNumber] = verse.text_indopak;
+      }
+    }
+
+    const nextPage = data.pagination?.next_page;
+    if (!nextPage || nextPage === page) return ayahText;
+    page = nextPage;
+  }
+}
+
 export async function fetchSurahDetail(surahNumber: number): Promise<SurahDetail> {
-  const [arabicRes, hindiRes, englishRes, audioRes] = await Promise.all([
+  const [arabicRes, hindiRes, englishRes, audioRes, indopakAyahs] = await Promise.all([
     fetch(`${BASE_URL}/surah/${surahNumber}`, { next: { revalidate: 86400 } }),
     ENABLE_LOCALIZED_LANGUAGES
       ? fetch(`${BASE_URL}/surah/${surahNumber}/hi.farooq`, { next: { revalidate: 86400 } })
       : Promise.resolve(null),
     fetch(`${BASE_URL}/surah/${surahNumber}/en.sahih`, { next: { revalidate: 86400 } }),
     fetch(`${BASE_URL}/surah/${surahNumber}/ar.alafasy`, { next: { revalidate: 86400 } }),
+    fetchIndoPakAyahText(surahNumber).catch(() => ({} as Record<number, string>)),
   ]);
 
   if (!arabicRes.ok) throw new Error("Failed to fetch Surah");
@@ -315,7 +360,11 @@ export async function fetchSurahDetail(surahNumber: number): Promise<SurahDetail
     return {
       number: a.number,
       numberInSurah: a.numberInSurah,
-      text: a.text,
+      text: cleanAyahTextForDisplay(
+        indopakAyahs[ayahNumber] || String(a.text || ""),
+        surahInfo.number,
+        ayahNumber
+      ),
       translation_hi: hindiTranslation,
       translation_en: englishTranslation,
       translation: ENABLE_LOCALIZED_LANGUAGES
