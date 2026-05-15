@@ -16,6 +16,7 @@ create table public.hadiths (
   review_status text check (review_status in ('imported', 'source_listed', 'reviewed', 'published')) not null default 'source_listed',
   reviewed_by text,
   reviewed_at timestamp with time zone,
+  published boolean not null default true,
   hindi_text text,
   hinglish_text text,
   created_at timestamp with time zone default timezone('utc', now())
@@ -31,6 +32,7 @@ alter table public.hadiths add constraint uq_hadiths_collection_number unique (c
 -- Index for common queries
 create index idx_hadiths_difficulty on public.hadiths(difficulty);
 create index idx_hadiths_learning_tier on public.hadiths(learning_tier);
+create index idx_hadiths_published_learning_tier on public.hadiths(published, learning_tier);
 create index idx_hadiths_collection on public.hadiths(collection);
 create index idx_hadiths_topic on public.hadiths(topic);
 create index idx_hadiths_review_status on public.hadiths(review_status);
@@ -41,6 +43,7 @@ alter table public.hadiths add column if not exists learning_tier text;
 alter table public.hadiths add column if not exists review_status text default 'source_listed';
 alter table public.hadiths add column if not exists reviewed_by text;
 alter table public.hadiths add column if not exists reviewed_at timestamp with time zone;
+alter table public.hadiths add column if not exists published boolean not null default true;
 
 update public.hadiths
 set learning_tier = case difficulty
@@ -50,6 +53,31 @@ set learning_tier = case difficulty
   else 'must_know'
 end
 where learning_tier is null;
+
+-- Re-tier previously imported large hadith libraries from source metadata.
+-- This keeps the old quiz difficulty field as a compatibility mirror, while
+-- making learning_tier the primary browsing classification.
+update public.hadiths
+set learning_tier = case
+  when lower(coalesce(book_name, '') || ' ' || coalesce(chapter, '') || ' ' || coalesce(topic, '') || ' ' || coalesce(english_text, '')) ~
+    '(inheritance|divorce|penalty|punishment|legal|judgement|judgment|sales|loans|mortgage|jihad|expedition|blood money|oaths|vows|manumission|theology|fitan|end times)'
+    then 'deep_dive'
+  when lower(coalesce(book_name, '') || ' ' || coalesce(chapter, '') || ' ' || coalesce(topic, '') || ' ' || coalesce(english_text, '')) ~
+    '(faith|belief|iman|islam|intention|prayer|salah|zakat|fast|ramadan|hajj|quran|purification|wudu|ablution|manners|character|truth|honesty)'
+    then 'must_know'
+  when lower(coalesce(book_name, '') || ' ' || coalesce(chapter, '') || ' ' || coalesce(topic, '') || ' ' || coalesce(english_text, '')) ~
+    '(charity|dua|supplication|remembrance|dhikr|family|parents|neighbour|neighbor|kindness|mercy|food|drink|travel|sleep|market|business|marriage|illness)'
+    then 'good_to_know'
+  else learning_tier
+end;
+
+update public.hadiths
+set difficulty = case learning_tier
+  when 'must_know' then 'easy'
+  when 'good_to_know' then 'medium'
+  when 'deep_dive' then 'hard'
+  else difficulty
+end;
 
 update public.hadiths
 set review_status = 'source_listed'

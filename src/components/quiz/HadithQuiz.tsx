@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getHadithsByDifficulty } from "@/lib/hadiths";
+import { fetchHadithQuizPool } from "@/lib/hadith-api";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { CheckCircle, XCircle, ArrowRight, Trophy, RefreshCw, Loader2 } from "lucide-react";
@@ -61,7 +61,7 @@ export default function HadithQuiz({ difficulty }: Props) {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
   }, []);
 
-  const loadQuestions = useCallback(() => {
+  const loadQuestions = useCallback(async () => {
     setLoading(true);
     setCurrentIdx(0);
     setSelected(null);
@@ -69,44 +69,49 @@ export default function HadithQuiz({ difficulty }: Props) {
     setFinished(false);
     setResults([]);
 
-    const pool = shuffle(getHadithsByDifficulty(difficulty));
-    const picked = pool.slice(0, TOTAL_QUESTIONS);
-    const allHadiths = pool;
+    try {
+      const pool = shuffle(await fetchHadithQuizPool(difficulty));
+      const picked = pool.slice(0, TOTAL_QUESTIONS);
+      const allHadiths = pool;
 
-    const qs: QuizQuestion[] = [];
+      const qs: QuizQuestion[] = [];
 
-    for (const hadith of picked) {
-      const [firstHalf, secondHalf] = splitHadith(hadith.english_text);
+      for (const hadith of picked) {
+        const [firstHalf, secondHalf] = splitHadith(hadith.english_text);
 
-      if (!secondHalf) continue;
+        if (!secondHalf) continue;
 
-      const distractors = shuffle(
-        allHadiths
-          .filter((h) => h.id !== hadith.id)
-          .map((h) => splitHadith(h.english_text)[1])
-          .filter(Boolean)
-      ).slice(0, 3);
+        const distractors = shuffle(
+          allHadiths
+            .filter((h) => h.id !== hadith.id)
+            .map((h) => splitHadith(h.english_text)[1])
+            .filter(Boolean)
+        ).slice(0, 3);
 
-      if (distractors.length < 3) continue;
+        if (distractors.length < 3) continue;
 
-      qs.push({
-        id: hadith.id,
-        arabicText: hadith.arabic_text,
-        promptText: firstHalf,
-        correctCompletion: secondHalf,
-        options: shuffle([secondHalf, ...distractors]),
-        narrator: hadith.narrator_en,
-        collection: hadith.collection,
-        hadithNumber: hadith.hadith_number,
-      });
+        qs.push({
+          id: hadith.id,
+          arabicText: hadith.arabic_text,
+          promptText: firstHalf,
+          correctCompletion: secondHalf,
+          options: shuffle([secondHalf, ...distractors]),
+          narrator: hadith.narrator_en,
+          collection: hadith.collection,
+          hadithNumber: hadith.hadith_number,
+        });
+      }
+
+      setQuestions(qs);
+    } catch {
+      setQuestions([]);
+    } finally {
+      setLoading(false);
     }
-
-    setQuestions(qs);
-    setLoading(false);
   }, [difficulty]);
 
   useEffect(() => {
-    loadQuestions();
+    void loadQuestions();
   }, [loadQuestions]);
 
   const handleSelect = async (option: string) => {
@@ -159,7 +164,7 @@ export default function HadithQuiz({ difficulty }: Props) {
       <div className="text-center py-20">
         <p className="text-lg text-muted-foreground mb-4">{t("quiz_empty", lang)}</p>
         <button
-          onClick={loadQuestions}
+          onClick={() => void loadQuestions()}
           className="px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors"
         >
           {t("quiz_reload", lang)}
@@ -211,7 +216,7 @@ export default function HadithQuiz({ difficulty }: Props) {
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
-              onClick={loadQuestions}
+              onClick={() => void loadQuestions()}
               className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-colors"
             >
               <RefreshCw className="h-4 w-4" />

@@ -355,38 +355,44 @@ export async function fetchDailyVerse(globalAyahNumber: number): Promise<DailyVe
 }
 
 export async function fetchSurahDetail(surahNumber: number): Promise<SurahDetail> {
-  const [arabicRes, hindiRes, englishRes, audioRes, indopakAyahs] = await Promise.all([
+  const [arabicRes, englishRes, hindiRes, urduRes, audioRes, indopakAyahs] = await Promise.all([
     fetch(`${BASE_URL}/surah/${surahNumber}`, { next: { revalidate: 86400 } }),
-    ENABLE_LOCALIZED_LANGUAGES
-      ? fetch(`${BASE_URL}/surah/${surahNumber}/hi.farooq`, { next: { revalidate: 86400 } })
-      : Promise.resolve(null),
     fetch(`${BASE_URL}/surah/${surahNumber}/en.sahih`, { next: { revalidate: 86400 } }),
+    fetch(`${BASE_URL}/surah/${surahNumber}/hi.farooq`, { next: { revalidate: 86400 } }).catch(() => null),
+    fetch(`${BASE_URL}/surah/${surahNumber}/ur.jalandhry`, { next: { revalidate: 86400 } }).catch(() => null),
     fetch(`${BASE_URL}/surah/${surahNumber}/ar.alafasy`, { next: { revalidate: 86400 } }),
     fetchIndoPakAyahText(surahNumber).catch(() => ({} as Record<number, string>)),
   ]);
 
   if (!arabicRes.ok) throw new Error("Failed to fetch Surah");
 
-  const [arabicData, hindiData, englishData, audioData] = await Promise.all([
+  const [arabicData, englishData, hindiData, urduData, audioData] = await Promise.all([
     arabicRes.json(),
-    hindiRes?.ok ? hindiRes.json() : null,
     englishRes.ok ? englishRes.json() : null,
+    hindiRes?.ok ? hindiRes.json() : null,
+    urduRes?.ok ? urduRes.json() : null,
     audioRes.ok ? audioRes.json() : null,
   ]);
 
   const surahInfo = arabicData.data;
-  const hindiAyahs: Record<number, string> = {};
   const englishAyahs: Record<number, string> = {};
+  const hindiAyahs: Record<number, string> = {};
+  const urduAyahs: Record<number, string> = {};
   const audioMap: Record<number, string> = {};
 
+  if (englishData?.data?.ayahs) {
+    for (const a of englishData.data.ayahs) {
+      englishAyahs[a.numberInSurah] = a.text;
+    }
+  }
   if (hindiData?.data?.ayahs) {
     for (const a of hindiData.data.ayahs) {
       hindiAyahs[a.numberInSurah] = a.text;
     }
   }
-  if (englishData?.data?.ayahs) {
-    for (const a of englishData.data.ayahs) {
-      englishAyahs[a.numberInSurah] = a.text;
+  if (urduData?.data?.ayahs) {
+    for (const a of urduData.data.ayahs) {
+      urduAyahs[a.numberInSurah] = a.text;
     }
   }
   if (audioData?.data?.ayahs) {
@@ -409,6 +415,7 @@ export async function fetchSurahDetail(surahNumber: number): Promise<SurahDetail
     const ayahNumber = a.numberInSurah as number;
     const englishTranslation = englishAyahs[ayahNumber] || "";
     const hindiTranslation = hindiAyahs[ayahNumber] || "";
+    const urduTranslation = urduAyahs[ayahNumber] || "";
 
     return {
       number: a.number,
@@ -420,6 +427,7 @@ export async function fetchSurahDetail(surahNumber: number): Promise<SurahDetail
       ),
       translation_hi: hindiTranslation,
       translation_en: englishTranslation,
+      translation_ur: urduTranslation,
       translation: ENABLE_LOCALIZED_LANGUAGES
         ? hindiTranslation || englishTranslation
         : englishTranslation,

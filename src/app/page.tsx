@@ -18,7 +18,7 @@ import {
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { useArabicFont } from "@/lib/useArabicFont";
-import { CURATED_HADITHS } from "@/lib/hadiths";
+import { fetchDailyHadith, type HadithRow } from "@/lib/hadith-api";
 import { fetchDailyVerse, type DailyVerseResult } from "@/lib/quran-api";
 import { cleanArabicTextForDisplay } from "@/lib/quran-text";
 import { getBookmarks, type Bookmark } from "@/lib/bookmarks";
@@ -38,6 +38,7 @@ export default function HomePage() {
   const arabicFont = useArabicFont();
   const [verse, setVerse] = useState<DailyVerseResult | null>(null);
   const [verseLoading, setVerseLoading] = useState(true);
+  const [dailyHadith, setDailyHadith] = useState<HadithRow | null>(null);
   const [homeProgress, setHomeProgress] = useState<{
     today: Awaited<ReturnType<typeof getTodayEventCounts>>;
     lastRead: Awaited<ReturnType<typeof getLastReadPosition>>;
@@ -46,7 +47,6 @@ export default function HomePage() {
   } | null>(null);
 
   const dayOfYear = getDayOfYear();
-  const dailyHadith = CURATED_HADITHS[dayOfYear % CURATED_HADITHS.length];
 
   useEffect(() => {
     const ayahNumber = (dayOfYear % 6236) + 1;
@@ -65,6 +65,20 @@ export default function HomePage() {
       mounted = false;
     };
   }, [dayOfYear]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    fetchDailyHadith()
+      .then((hadith) => {
+        if (mounted) setDailyHadith(hadith);
+      })
+      .catch(() => {});
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -375,26 +389,32 @@ export default function HomePage() {
                 <h3 className="text-sm font-semibold uppercase tracking-wider opacity-80 mb-4">
                   📜 {t("daily_hadith_title", lang)}
                 </h3>
-                <p className={`text-2xl sm:text-3xl ${arabicFont} leading-loose mb-4 text-right`}>
-                  {cleanArabicTextForDisplay(dailyHadith.arabic_text)}
-                </p>
-                <p className="text-sm sm:text-base opacity-90 leading-relaxed mb-3">
-                  &ldquo;{dailyHadith.english_text}&rdquo;
-                </p>
-                <p className="text-xs opacity-60">
-                  — {dailyHadith.narrator_en} | {dailyHadith.collection.charAt(0).toUpperCase() + dailyHadith.collection.slice(1)} #{dailyHadith.hadith_number}
-                </p>
-                <SourceTrust
-                  compact
-                  className="mt-4 [&>span]:border-white/20 [&>span]:bg-white/15 [&>span]:text-white/85 [&_span]:text-white/90"
-                  items={[
-                    {
-                      label: "Hadith",
-                      value: `${dailyHadith.collection.replace("_", " ")} #${dailyHadith.hadith_number}`,
-                    },
-                    { label: "Grade", value: dailyHadith.grade.toUpperCase() },
-                  ]}
-                />
+                {dailyHadith ? (
+                  <>
+                    <p className={`text-2xl sm:text-3xl ${arabicFont} leading-loose mb-4 text-right`}>
+                      {cleanArabicTextForDisplay(dailyHadith.arabic_text)}
+                    </p>
+                    <p className="text-sm sm:text-base opacity-90 leading-relaxed mb-3">
+                      &ldquo;{dailyHadith.english_text}&rdquo;
+                    </p>
+                    <p className="text-xs opacity-60">
+                      — {dailyHadith.narrator_en} | {dailyHadith.collection.charAt(0).toUpperCase() + dailyHadith.collection.slice(1)} #{dailyHadith.hadith_number}
+                    </p>
+                    <SourceTrust
+                      compact
+                      className="mt-4 [&>span]:border-white/20 [&>span]:bg-white/15 [&>span]:text-white/85 [&_span]:text-white/90"
+                      items={[
+                        {
+                          label: "Hadith",
+                          value: `${dailyHadith.collection.replace("_", " ")} #${dailyHadith.hadith_number}`,
+                        },
+                        { label: "Grade", value: dailyHadith.grade.toUpperCase() },
+                      ]}
+                    />
+                  </>
+                ) : (
+                  <p className="text-white/70 text-sm">{t("quiz_loading", lang)}</p>
+                )}
               </div>
             </div>
 

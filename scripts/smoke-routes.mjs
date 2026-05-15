@@ -55,6 +55,7 @@ async function main() {
   });
 
   let output = "";
+  let shutdownRequested = false;
   server.stdout.on("data", (chunk) => {
     output += chunk.toString();
   });
@@ -72,6 +73,7 @@ async function main() {
       console.log(`${status} ${route}`);
     }
   } finally {
+    shutdownRequested = true;
     server.kill("SIGTERM");
   }
 
@@ -80,7 +82,7 @@ async function main() {
     setTimeout(resolve, 3000);
   });
 
-  if (server.exitCode && server.exitCode !== 0 && server.exitCode !== null) {
+  if (!shutdownRequested && server.exitCode && server.exitCode !== 0 && server.exitCode !== null) {
     throw new Error(`Smoke server exited with ${server.exitCode}\n${output}`);
   }
 }

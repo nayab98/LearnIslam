@@ -305,7 +305,7 @@ const translations: Record<string, Record<Lang, string>> = {
   back_to_hadees: { hi: "हदीस पर वापस जाएं", hinglish: "Hadees par wapas jaayein", en: "Back to Hadith" },
   back_to_surahs: { hi: "सूरतों पर वापस जाएं", hinglish: "Suraaton par wapas jaayein", en: "Back to Surahs" },
   hadith_count: { hi: "{count} हदीसें", hinglish: "{count} Hadeesein", en: "{count} hadith" },
-  showing_local_data: { hi: "ऑफ़लाइन डेटा दिखाया जा रहा है", hinglish: "Offline data dikhaya ja raha hai", en: "Showing offline data" },
+  showing_local_data: { hi: "बंडल की हुई हदीस लाइब्रेरी दिख रही है", hinglish: "Bundled hadith library dikh rahi hai", en: "Showing the bundled hadith library." },
   tafsir: { hi: "तफ़सीर", hinglish: "Tafsir", en: "Tafsir" },
   tafsir_loading: { hi: "तफ़सीर लोड हो रही है...", hinglish: "Tafsir load ho rahi hai...", en: "Loading tafsir..." },
   tafsir_unavailable: { hi: "तफ़सीर उपलब्ध नहीं है", hinglish: "Tafsir available nahi hai", en: "Tafsir not available" },

@@ -43,7 +43,8 @@ flowchart TD
   Admin[Admin / Reviewer] --> Review[Content Review Workflow]
   Review --> DB
 
-  DB --> Content[Quran, Hadith, Dua, Words, Tafsir Metadata]
+  App --> StaticContent[Repo JSON content: Hadith, Dua, Words]
+  DB --> Content[User-linked content metadata]
   DB --> Learning[Progress, Reviews, Bookmarks, Notes]
   DB --> Game[XP, Badges, Streaks, Contest Attempts]
   DB --> FutureShop[Future Rewards Catalog]
@@ -97,7 +98,8 @@ flowchart LR
 |-------|-----------|
 | Frontend | Next.js 14 (App Router) + TypeScript |
 | Styling | Tailwind CSS v4 + shadcn/ui |
-| Backend/DB | Supabase (Postgres + Auth) |
+| Backend/DB | Supabase (Auth + user learning data) |
+| Static Content | Repo-versioned JSON |
 | Quran Data | [Al Quran Cloud API](https://alquran.cloud/api) + [Quran.com API v4](https://api-docs.quran.com) |
 | Audio | Islamic Network CDN |
 
@@ -178,6 +180,8 @@ Hadith content uses `learning_tier` separately from quiz `difficulty`:
 | `deep_dive` | `hard` | Fiqh, theology, advanced themes, and longer narrations |
 
 Content trust fields should be filled before publishing: `source_name`, `collection`, `book_name`, `chapter`, `hadith_number`, `grade`, `topic`, `review_status`, `reviewed_by`, and `reviewed_at`.
+
+Hadith content is stored in split JSON files under `src/data/hadiths/`, one file per learning tier. To rebuild the larger hadith library, run `SUNNAH_API_KEY=your_key node scripts/seed-hadiths.js` after confirming the source/API terms allow committing generated records. The importer fetches authentic `sahih`/`hasan` narrations, assigns `learning_tier` using source metadata and topic keywords, and writes a balanced library of 1000 hadiths per tier by default. Tier pages default to 25 hadiths per page, which gives 40 pages for each 1000-hadith tier. `difficulty` remains only as a quiz compatibility mirror.
 
 ## Verification
 

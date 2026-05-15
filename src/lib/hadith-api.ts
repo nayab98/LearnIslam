@@ -1,84 +1,64 @@
-import { createClient } from "@/lib/supabase/client";
-import {
-  HadithLearningTier,
-  HadithReviewStatus,
-  legacyDifficultyForTier,
-  resolveHadithTierParam,
-} from "@/lib/hadith-tiers";
+import { Hadith } from "@/lib/hadiths";
+import { HadithLearningTier, resolveHadithTierParam } from "@/lib/hadith-tiers";
 
-export interface HadithRow {
-  id: number;
-  hadith_number: number;
-  collection: string;
-  source_name?: string | null;
-  book_name?: string | null;
-  chapter?: string | null;
-  arabic_text: string;
-  english_text: string;
-  hindi_text: string | null;
-  hinglish_text: string | null;
-  narrator_en: string;
-  grade: string;
-  difficulty: string;
-  learning_tier?: HadithLearningTier | null;
-  review_status?: HadithReviewStatus | null;
-  reviewed_by?: string | null;
-  reviewed_at?: string | null;
-  topic: string;
+export type HadithRow = Hadith;
+
+const DEFAULT_PAGE_SIZE = 25;
+
+export async function fetchHadithsPage(tierOrLegacyLevel: string, page: number, pageSize = DEFAULT_PAGE_SIZE) {
+  const params = new URLSearchParams({
+    tier: tierOrLegacyLevel,
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+
+  const res = await fetch(`/api/hadiths?${params.toString()}`);
+  if (!res.ok) throw new Error("Could not load hadiths");
+
+  return await res.json() as {
+    hadiths: HadithRow[];
+    total: number;
+    page: number;
+    pageSize: number;
+  };
 }
 
-const PAGE_SIZE = 10;
-
-async function queryHadithsByField(field: "learning_tier" | "difficulty", value: string, page: number) {
-  const supabase = createClient();
-  const from = (page - 1) * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
-
-  const { data, count, error } = await supabase
-    .from("hadiths")
-    .select("*", { count: "exact" })
-    .eq(field, value)
-    .range(from, to)
-    .order("id", { ascending: true });
-
-  if (error) throw error;
-  return { hadiths: (data || []) as HadithRow[], total: count || 0, pageSize: PAGE_SIZE };
-}
-
-export async function fetchHadithsPage(tierOrLegacyLevel: string, page: number) {
-  const tier = resolveHadithTierParam(tierOrLegacyLevel);
-  if (!tier) throw new Error("Invalid hadith tier");
-
-  try {
-    const byTier = await queryHadithsByField("learning_tier", tier, page);
-    if (byTier.total > 0 || byTier.hadiths.length > 0) return byTier;
-  } catch {
-    // Older Supabase tables may not have learning_tier yet.
-  }
-
-  return queryHadithsByField("difficulty", legacyDifficultyForTier(tier), page);
-}
-
-async function queryHadithCountByField(field: "learning_tier" | "difficulty", value: string): Promise<number> {
-  const supabase = createClient();
-  const { count, error } = await supabase
-    .from("hadiths")
-    .select("*", { count: "exact", head: true })
-    .eq(field, value);
-  if (error) throw error;
-  return count || 0;
+export async function getHadithCounts(): Promise<Record<HadithLearningTier, number>> {
+  const res = await fetch("/api/hadiths/counts");
+  if (!res.ok) throw new Error("Could not load hadith counts");
+  const data = await res.json() as { counts: Record<HadithLearningTier, number> };
+  return data.counts;
 }
 
 export async function getHadithCount(tierOrLegacyLevel: string): Promise<number> {
+  const counts = await getHadithCounts();
   const tier = resolveHadithTierParam(tierOrLegacyLevel);
-  if (!tier) return 0;
+  return tier ? counts[tier] ?? 0 : 0;
+}
 
-  try {
-    const byTier = await queryHadithCountByField("learning_tier", tier);
-    if (byTier > 0) return byTier;
-  } catch {
-    // Older Supabase tables may not have learning_tier yet.
-  }
+export async function searchHadiths(query: string, limit = 50): Promise<HadithRow[]> {
+  const params = new URLSearchParams({
+    q: query,
+    limit: String(limit),
+  });
 
-  return queryHadithCountByField("difficulty", legacyDifficultyForTier(tier));
+  const res = await fetch(`/api/hadiths/search?${params.toString()}`);
+  if (!res.ok) throw new Error("Could not search hadiths");
+  const data = await res.json() as { hadiths: HadithRow[] };
+  return data.hadiths;
+}
+
+export async function fetchDailyHadith(): Promise<HadithRow | null> {
+  const res = await fetch("/api/hadiths/daily");
+  if (!res.ok) throw new Error("Could not load daily hadith");
+  const data = await res.json() as { hadith: HadithRow | null };
+  return data.hadith;
+}
+
+export async function fetchHadithQuizPool(difficulty: "easy" | "medium" | "hard"): Promise<HadithRow[]> {
+  const params = new URLSearchParams({ difficulty });
+  const res = await fetch(`/api/hadiths/quiz?${params.toString()}`);
+  if (!res.ok) throw new Error("Could not load hadith quiz");
+  const data = await res.json() as { hadiths: HadithRow[] };
+  return data.hadiths;
 }

@@ -16,7 +16,7 @@ interface SourceTrustProps {
 
 const REVIEW_LABELS: Record<ReviewStatus, string> = {
   source_listed: "Source listed",
-  needs_review: "Needs scholarly review",
+  needs_review: "Source listed",
 };
 
 export function SourceTrust({
@@ -42,7 +42,7 @@ export function SourceTrust({
       ))}
       <span
         className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 ${
-          reviewStatus === "source_listed"
+          REVIEW_LABELS[reviewStatus] === REVIEW_LABELS.source_listed
             ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
             : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
         }`}

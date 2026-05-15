@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { ArrowLeft, Check, Heart } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
-import { getHadithLearningTier, getHadithsByLearningTier, getHadithSourceName, Hadith } from "@/lib/hadiths";
+import { getHadithLearningTier, getHadithSourceName } from "@/lib/hadiths";
 import { useArabicFont } from "@/lib/useArabicFont";
 import { fetchHadithsPage, HadithRow } from "@/lib/hadith-api";
 import { createClient } from "@/lib/supabase/client";
@@ -42,7 +42,7 @@ type UnifiedHadith = {
   reviewed_at?: string | null;
 };
 
-function toUnified(h: HadithRow | Hadith): UnifiedHadith {
+function toUnified(h: HadithRow): UnifiedHadith {
   return {
     id: h.id,
     arabic_text: h.arabic_text,
@@ -64,7 +64,26 @@ function toUnified(h: HadithRow | Hadith): UnifiedHadith {
   };
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
+const DEFAULT_PAGE_SIZE: PageSize = 25;
+const REMOTE_HADITH_TIMEOUT_MS = 2500;
+const PAGE_SIZE_STORAGE_KEY = "learnislam_hadith_page_size";
+
+function getInitialPageSize(): PageSize {
+  if (typeof window === "undefined") return DEFAULT_PAGE_SIZE;
+  const stored = Number(window.localStorage.getItem(PAGE_SIZE_STORAGE_KEY));
+  return PAGE_SIZE_OPTIONS.includes(stored as PageSize) ? (stored as PageSize) : DEFAULT_PAGE_SIZE;
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      window.setTimeout(() => reject(new Error("Hadith source timed out")), ms);
+    }),
+  ]);
+}
 
 export default function HadeesLevelPage() {
   const { lang } = useLanguage();
@@ -73,41 +92,34 @@ export default function HadeesLevelPage() {
   const level = params.level as string;
   const tier = resolveHadithTierParam(level);
 
+  const [pageSize, setPageSize] = useState<PageSize>(getInitialPageSize);
   const [hadiths, setHadiths] = useState<UnifiedHadith[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [source, setSource] = useState<"supabase" | "local">("supabase");
   const [userId, setUserId] = useState<string | null>(null);
   const [bookmarkedHadiths, setBookmarkedHadiths] = useState<Set<string>>(new Set());
   const [readHadiths, setReadHadiths] = useState<Set<number>>(new Set());
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const loadPage = useCallback(
     async (p: number) => {
       if (!tier) return;
       setLoading(true);
+
       try {
-        const res = await fetchHadithsPage(tier, p);
-        if (res.hadiths.length > 0 || res.total > 0) {
-          setHadiths(res.hadiths.map(toUnified));
-          setTotal(res.total);
-          setSource("supabase");
-        } else {
-          throw new Error("empty");
-        }
+        const res = await withTimeout(fetchHadithsPage(tier, p, pageSize), REMOTE_HADITH_TIMEOUT_MS);
+        setHadiths(res.hadiths.map(toUnified));
+        setTotal(res.total);
       } catch {
-        const local = getHadithsByLearningTier(tier);
-        const start = (p - 1) * PAGE_SIZE;
-        setHadiths(local.slice(start, start + PAGE_SIZE).map(toUnified));
-        setTotal(local.length);
-        setSource("local");
+        setHadiths([]);
+        setTotal(0);
       } finally {
         setLoading(false);
       }
     },
-    [tier],
+    [pageSize, tier],
   );
 
   useEffect(() => {
@@ -124,12 +136,18 @@ export default function HadeesLevelPage() {
   useEffect(() => {
     setPage(1);
     loadPage(1);
-  }, [level, loadPage]);
+  }, [level, loadPage, pageSize]);
 
   const goToPage = (p: number) => {
     setPage(p);
     loadPage(p);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const changePageSize = (nextPageSize: PageSize) => {
+    setPageSize(nextPageSize);
+    window.localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(nextPageSize));
+    setPage(1);
   };
 
   if (!tier) {
@@ -211,13 +229,29 @@ export default function HadeesLevelPage() {
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold">
-          {t("hadith_count", lang).replace("{count}", String(total))} — {meta.label}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">{meta.description}</p>
-        {source === "local" && (
-          <p className="text-xs text-muted-foreground mt-1">{t("showing_local_data", lang)}</p>
-        )}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">
+              {t("hadith_count", lang).replace("{count}", String(total))} — {meta.label}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">{meta.description}</p>
+          </div>
+          <label className="flex w-fit items-center gap-2 text-sm text-muted-foreground">
+            Per page
+            <select
+              value={pageSize}
+              onChange={(event) => changePageSize(Number(event.target.value) as PageSize)}
+              className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+              aria-label="Hadith per page"
+            >
+              {PAGE_SIZE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       {/* Loading skeleton */}
@@ -315,7 +349,7 @@ export default function HadeesLevelPage() {
                 </div>
                 <SourceTrust
                   className="mt-3"
-                  reviewStatus={h.review_status === "reviewed" || h.review_status === "published" ? "source_listed" : "needs_review"}
+                  reviewStatus="source_listed"
                   items={[
                     { label: "Hadith", value: `${getHadithSourceName(h)} #${h.hadith_number}` },
                     { label: "Grade", value: h.grade.toUpperCase() },

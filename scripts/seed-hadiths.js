@@ -2,28 +2,28 @@
 //
 // Prerequisites:
 // 1. Get sunnah.com API key: Create an issue at https://github.com/sunnah-com/api
-// 2. Get Supabase service role key from your Supabase dashboard > Settings > API
-// 3. Run the supabase-hadiths.sql in your Supabase SQL editor first
+// 2. Confirm the source/API terms allow committing generated records to this repo
 //
 // Usage:
-// SUNNAH_API_KEY=your_key SUPABASE_SERVICE_ROLE_KEY=your_key node scripts/seed-hadiths.js
+// SUNNAH_API_KEY=your_key node scripts/seed-hadiths.js
 //
-// This will fetch ~6,500 authentic hadiths and insert them into your Supabase database.
+// This will fetch several thousand authentic hadiths, then publish a balanced
+// starter library of 1000 hadiths per learning tier to src/data/hadiths/*.json.
 
-const { createClient } = require("@supabase/supabase-js");
+const fs = require("fs");
+const path = require("path");
 
 const SUNNAH_API_KEY = process.env.SUNNAH_API_KEY;
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const OUTPUT_DIR = process.env.HADITH_OUTPUT_DIR
+  ? path.resolve(process.env.HADITH_OUTPUT_DIR)
+  : path.join(__dirname, "..", "src", "data", "hadiths");
 
-if (!SUNNAH_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+if (!SUNNAH_API_KEY) {
   console.error(
-    "Missing env vars. Required: SUNNAH_API_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY"
+    "Missing env var. Required: SUNNAH_API_KEY"
   );
   process.exit(1);
 }
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 const SUNNAH_BASE = "https://api.sunnah.com/v1";
 const COLLECTIONS = ["bukhari", "muslim", "abudawud", "tirmidhi"];
@@ -34,9 +34,83 @@ const COLLECTION_DB_NAME = {
   abudawud: "abu_dawud",
   tirmidhi: "tirmidhi",
 };
-const BATCH_SIZE = 100;
 const MAX_RETRIES = 3;
 const REQUEST_DELAY_MS = 200;
+const TARGET_PER_TIER = Number(process.env.HADITHS_PER_TIER || 1000);
+const LEARNING_TIERS = ["must_know", "good_to_know", "deep_dive"];
+
+const SOURCE_NAME = {
+  bukhari: "Sahih Bukhari",
+  muslim: "Sahih Muslim",
+  abudawud: "Sunan Abu Dawud",
+  tirmidhi: "Jami at-Tirmidhi",
+};
+
+const MUST_KNOW_KEYWORDS = [
+  "faith",
+  "belief",
+  "iman",
+  "islam",
+  "intention",
+  "prayer",
+  "salah",
+  "zakat",
+  "fast",
+  "ramadan",
+  "hajj",
+  "quran",
+  "purification",
+  "wudu",
+  "ablution",
+  "manners",
+  "character",
+  "truth",
+  "honesty",
+];
+
+const GOOD_TO_KNOW_KEYWORDS = [
+  "charity",
+  "dua",
+  "supplication",
+  "remembrance",
+  "dhikr",
+  "family",
+  "parents",
+  "neighbour",
+  "neighbor",
+  "kindness",
+  "mercy",
+  "food",
+  "drink",
+  "travel",
+  "sleep",
+  "market",
+  "business",
+  "marriage",
+  "illness",
+];
+
+const DEEP_DIVE_KEYWORDS = [
+  "inheritance",
+  "divorce",
+  "penalty",
+  "punishment",
+  "legal",
+  "judgement",
+  "judgment",
+  "sales",
+  "loans",
+  "mortgage",
+  "jihad",
+  "expedition",
+  "blood money",
+  "oaths",
+  "vows",
+  "manumission",
+  "theology",
+  "fitan",
+  "end times",
+];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -150,22 +224,113 @@ function extractNarrator(hadith) {
   return null;
 }
 
-function assignDifficulty(index, total) {
-  const third = total / 3;
-  if (index < third) return "easy";
-  if (index < third * 2) return "medium";
+function includesAny(haystack, keywords) {
+  return keywords.some((keyword) => haystack.includes(keyword));
+}
+
+function classifyTier(item, index, total) {
+  const raw = item.raw;
+  const text = [
+    item.bookName,
+    item.chapterName,
+    extractNarrator(raw),
+    extractEnglishText(raw),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (includesAny(text, DEEP_DIVE_KEYWORDS)) return "deep_dive";
+  if (includesAny(text, MUST_KNOW_KEYWORDS)) return "must_know";
+  if (includesAny(text, GOOD_TO_KNOW_KEYWORDS)) return "good_to_know";
+
+  // Keep the full imported library browseable even when source metadata is sparse.
+  // Early canonical narrations tend to be foundational, middle books tend to be
+  // daily-life breadth, and later specialized books are better treated as deep dives.
+  const ratio = total === 0 ? 0 : index / total;
+  if (ratio < 0.2) return "must_know";
+  if (ratio < 0.75) return "good_to_know";
+  return "deep_dive";
+}
+
+function difficultyForTier(tier) {
+  if (tier === "must_know") return "easy";
+  if (tier === "good_to_know") return "medium";
   return "hard";
 }
 
-async function upsertBatch(rows) {
-  const { error } = await supabase.from("hadiths").upsert(rows, {
-    onConflict: "collection,hadith_number",
-    ignoreDuplicates: true,
-  });
+function extractTopic(item) {
+  const chapter = item.chapterName || "";
+  const book = item.bookName || "";
+  const source = chapter || book;
+  return source
+    .replace(/^chapter\s+\d+[:.\s-]*/i, "")
+    .replace(/^book\s+\d+[:.\s-]*/i, "")
+    .trim()
+    .slice(0, 120) || null;
+}
 
-  if (error) {
-    console.error(`  Supabase upsert error: ${error.message}`);
-    throw error;
+function rowKey(row) {
+  return `${row.collection}:${row.hadith_number}`;
+}
+
+function selectBalancedStarterRows(rows) {
+  const selectedKeys = new Set();
+  const selectedByTier = Object.fromEntries(LEARNING_TIERS.map((tier) => [tier, []]));
+
+  for (const tier of LEARNING_TIERS) {
+    const directMatches = rows.filter((row) => row.learning_tier === tier);
+    for (const row of directMatches) {
+      if (selectedByTier[tier].length >= TARGET_PER_TIER) break;
+      const key = rowKey(row);
+      if (selectedKeys.has(key)) continue;
+      selectedKeys.add(key);
+      selectedByTier[tier].push({ ...row, published: true });
+    }
+  }
+
+  for (const tier of LEARNING_TIERS) {
+    if (selectedByTier[tier].length >= TARGET_PER_TIER) continue;
+    const remaining = rows.filter((row) => !selectedKeys.has(rowKey(row)));
+
+    for (const row of remaining) {
+      if (selectedByTier[tier].length >= TARGET_PER_TIER) break;
+      const key = rowKey(row);
+      selectedKeys.add(key);
+      selectedByTier[tier].push({
+        ...row,
+        learning_tier: tier,
+        difficulty: difficultyForTier(tier),
+        published: true,
+      });
+    }
+  }
+
+  for (const tier of LEARNING_TIERS) {
+    if (selectedByTier[tier].length < TARGET_PER_TIER) {
+      console.warn(
+        `  Warning: only ${selectedByTier[tier].length}/${TARGET_PER_TIER} hadiths available for ${tier}`
+      );
+    }
+  }
+
+  return LEARNING_TIERS.flatMap((tier) => selectedByTier[tier]);
+}
+
+function publishRows(rows) {
+  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+
+  const rowsWithIds = rows.map((row, index) => ({
+    id: index + 1,
+    ...row,
+    review_status: row.review_status || "source_listed",
+  }));
+
+  for (const tier of LEARNING_TIERS) {
+    const tierRows = rowsWithIds.filter((row) => row.learning_tier === tier);
+    const filePath = path.join(OUTPUT_DIR, `${tier}.json`);
+    fs.writeFileSync(filePath, `${JSON.stringify(tierRows, null, 2)}\n`);
+    console.log(`  Wrote ${tierRows.length} hadiths to ${filePath}`);
   }
 }
 
@@ -202,27 +367,24 @@ async function seedCollection(collection) {
 
   console.log(`  Total authentic hadiths for ${collection}: ${allHadiths.length}`);
 
-  const rows = allHadiths.map((item, i) => ({
-    hadith_number: item.raw.hadithNumber,
-    collection: dbName,
-    book_name: item.bookName,
-    chapter: item.chapterName,
-    arabic_text: extractArabicText(item.raw) || "(no Arabic text)",
-    english_text: extractEnglishText(item.raw) || "(no English text)",
-    narrator_en: extractNarrator(item.raw),
-    grade: extractGrade(collection, item.raw),
-    difficulty: assignDifficulty(i, allHadiths.length),
-  }));
-
-  let inserted = 0;
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE);
-    await upsertBatch(batch);
-    inserted += batch.length;
-    console.log(
-      `  Inserted ${inserted}/${rows.length} into Supabase`
-    );
-  }
+  const rows = allHadiths.map((item, i) => {
+    const learningTier = classifyTier(item, i, allHadiths.length);
+    return {
+      hadith_number: item.raw.hadithNumber,
+      collection: dbName,
+      source_name: SOURCE_NAME[collection],
+      book_name: item.bookName,
+      chapter: item.chapterName,
+      arabic_text: extractArabicText(item.raw) || "(no Arabic text)",
+      english_text: extractEnglishText(item.raw) || "(no English text)",
+      narrator_en: extractNarrator(item.raw),
+      grade: extractGrade(collection, item.raw),
+      difficulty: difficultyForTier(learningTier),
+      learning_tier: learningTier,
+      topic: extractTopic(item),
+      review_status: "source_listed",
+    };
+  });
 
   return rows;
 }
@@ -231,17 +393,15 @@ async function main() {
   console.log("Hadith Seed Script — LearnIslam");
   console.log("================================");
 
-  const summary = { total: 0, easy: 0, medium: 0, hard: 0 };
+  const summary = { total: 0, must_know: 0, good_to_know: 0, deep_dive: 0 };
   const collectionCounts = {};
+  const importedRows = [];
 
   for (const collection of COLLECTIONS) {
     try {
       const rows = await seedCollection(collection);
       collectionCounts[collection] = rows.length;
-      for (const r of rows) {
-        summary.total++;
-        summary[r.difficulty]++;
-      }
+      importedRows.push(...rows);
     } catch (err) {
       console.error(`\nFATAL error seeding ${collection}: ${err.message}`);
       console.error(
@@ -250,13 +410,24 @@ async function main() {
     }
   }
 
+  const starterRows = selectBalancedStarterRows(importedRows);
+  console.log(`\nWriting balanced starter library: ${TARGET_PER_TIER} per tier (${starterRows.length} total)...`);
+  publishRows(starterRows);
+
+  for (const r of starterRows) {
+    summary.total++;
+    summary[r.learning_tier]++;
+  }
+
   console.log(`\n${"=".repeat(60)}`);
   console.log("SEED COMPLETE");
   console.log(`${"=".repeat(60)}`);
   for (const [col, count] of Object.entries(collectionCounts)) {
     console.log(`  ${col}: ${count} hadiths`);
   }
-  console.log(`\nTotal inserted: ${summary.total} (Easy: ${summary.easy}, Medium: ${summary.medium}, Hard: ${summary.hard})`);
+  console.log(
+    `\nTotal inserted: ${summary.total} (Must Know: ${summary.must_know}, Good to Know: ${summary.good_to_know}, Deep Dive: ${summary.deep_dive})`
+  );
 }
 
 main().catch((err) => {

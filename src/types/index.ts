@@ -15,6 +15,7 @@ export interface Ayah {
   translation: string;
   translation_hi: string;
   translation_en: string;
+  translation_ur: string;
   audio?: string;
   words?: Word[];
 }

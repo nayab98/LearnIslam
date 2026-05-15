@@ -25,8 +25,15 @@ interface SurahReaderProps {
 type ReaderMode = "study" | "flow";
 type ArabicFontSize = "sm" | "md" | "lg";
 type ReaderLineSpacing = "compact" | "comfortable" | "spacious";
+type TranslationLang = "en" | "hi" | "ur";
 
 const READER_SETTINGS_KEY = "learnislam_reader_settings";
+const TRANSLATION_LANG_STORAGE_KEY = "learnislam_translation_lang";
+const TRANSLATION_OPTIONS: { value: TranslationLang; label: string; source: string; dir: "ltr" | "rtl" }[] = [
+  { value: "en", label: "EN", source: "Sahih International", dir: "ltr" },
+  { value: "hi", label: "हिंदी", source: "Farooq Khan and Ahmed", dir: "ltr" },
+  { value: "ur", label: "اردو", source: "Fateh Muhammad Jalandhry", dir: "rtl" },
+];
 const FONT_SIZE_CLASSES: Record<ArabicFontSize, string> = {
   sm: "text-[1.875rem] sm:text-[2.25rem] md:text-[2.5rem]",
   md: "text-[2.25rem] sm:text-[2.75rem] md:text-[3rem]",
@@ -50,6 +57,7 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
   const [readerMode, setReaderMode] = useState<ReaderMode>("study");
   const [arabicFontSize, setArabicFontSize] = useState<ArabicFontSize>("md");
   const [lineSpacing, setLineSpacing] = useState<ReaderLineSpacing>("comfortable");
+  const [translationLang, setTranslationLang] = useState<TranslationLang>("en");
   const [wordByWordMode, setWordByWordMode] = useState(false);
   const [tajweedMode, setTajweedMode] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -82,6 +90,7 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
           showTranslation?: boolean;
           arabicFontSize?: ArabicFontSize;
           lineSpacing?: ReaderLineSpacing;
+          translationLang?: TranslationLang;
         };
         if (parsed.readerMode === "study" || parsed.readerMode === "flow") setReaderMode(parsed.readerMode);
         if (typeof parsed.showTranslation === "boolean") setShowTranslation(parsed.showTranslation);
@@ -95,6 +104,9 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
         ) {
           setLineSpacing(parsed.lineSpacing);
         }
+        if (parsed.translationLang === "en" || parsed.translationLang === "hi" || parsed.translationLang === "ur") {
+          setTranslationLang(parsed.translationLang);
+        }
       } catch {
         // Fall back to older mode-only preference.
       }
@@ -104,14 +116,20 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
         setReaderMode(savedReaderMode);
       }
     }
+
+    const savedTranslationLang = localStorage.getItem(TRANSLATION_LANG_STORAGE_KEY);
+    if (savedTranslationLang === "en" || savedTranslationLang === "hi" || savedTranslationLang === "ur") {
+      setTranslationLang(savedTranslationLang);
+    }
   }, []);
 
   useEffect(() => {
     localStorage.setItem(
       READER_SETTINGS_KEY,
-      JSON.stringify({ readerMode, showTranslation, arabicFontSize, lineSpacing })
+      JSON.stringify({ readerMode, showTranslation, arabicFontSize, lineSpacing, translationLang })
     );
-  }, [readerMode, showTranslation, arabicFontSize, lineSpacing]);
+    localStorage.setItem(TRANSLATION_LANG_STORAGE_KEY, translationLang);
+  }, [readerMode, showTranslation, arabicFontSize, lineSpacing, translationLang]);
 
   useEffect(() => {
     if (!userId) return;
@@ -181,6 +199,21 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
   const handleReaderModeChange = (mode: ReaderMode) => {
     setReaderMode(mode);
     localStorage.setItem("learnislam_reader_mode", mode);
+  };
+
+  const selectedTranslationOption =
+    TRANSLATION_OPTIONS.find((option) => option.value === translationLang) ?? TRANSLATION_OPTIONS[0];
+
+  const getTranslationText = (ayah: Ayah) => {
+    if (translationLang === "ur") return ayah.translation_ur || ayah.translation_en;
+    if (translationLang === "hi") return ayah.translation_hi || ayah.translation_en;
+    return ayah.translation_en;
+  };
+
+  const getTranslationSource = (ayah?: Ayah) => {
+    if (translationLang === "ur" && ayah?.translation_ur) return selectedTranslationOption.source;
+    if (translationLang === "hi" && ayah?.translation_hi) return selectedTranslationOption.source;
+    return TRANSLATION_OPTIONS[0].source;
   };
 
   const handleMarkRead = async (ayahNumber: number) => {
@@ -419,6 +452,24 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
               {showTranslation ? t("tarjuma_hide", lang) : t("tarjuma_show", lang)}
             </button>
 
+            <div className="flex items-center gap-1 rounded-xl border border-border p-1">
+              {TRANSLATION_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setTranslationLang(option.value)}
+                  className={`min-w-10 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                    translationLang === option.value
+                      ? "bg-blue-600 text-white"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  }`}
+                  dir={option.dir}
+                  aria-label={`Show ${option.source} translation`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
             {/* Word by word toggle */}
             <button
               onClick={() => setWordByWordMode(!wordByWordMode)}
@@ -450,7 +501,7 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
         className="mb-6"
         items={[
           { label: "Arabic text", value: "Quran.com IndoPak text" },
-          { label: "Translation", value: "Sahih International" },
+          { label: "Translation", value: getTranslationSource(ayahs[0]) },
           { label: "Tafsir", value: "Tafsir Ibn Kathir via Quran.com" },
         ]}
       />
@@ -502,6 +553,8 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
         )}
         {ayahs.map((ayah) => {
           const displayText = cleanAyahTextForDisplay(ayah.text, surah.number, ayah.numberInSurah);
+          const translationText = getTranslationText(ayah);
+          const translationDir = translationLang === "ur" && ayah.translation_ur ? "rtl" : "ltr";
           const isActive = activeAyah === ayah.numberInSurah;
           const isRead = readAyahs.has(ayah.numberInSurah);
           const tafsirKey = `${surah.number}:${ayah.numberInSurah}`;
@@ -610,14 +663,24 @@ export default function SurahReader({ surah, ayahs }: SurahReaderProps) {
                   onClick={(e) => e.stopPropagation()}
                 >
                   {/* Translation (Tarjuma) */}
-                  {showTranslation && ayah.translation_en && (
+                  {showTranslation && translationText && (
                     <div>
                       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
-                        {t("translation_source_en", lang)}
+                        Translation: {getTranslationSource(ayah)}
                       </p>
-                      <p className="text-sm leading-relaxed text-foreground/80">
-                        {ayah.translation_en}
+                      <p
+                        className={`text-sm leading-relaxed text-foreground/80 ${
+                          translationDir === "rtl" ? "text-right font-arabic" : ""
+                        }`}
+                        dir={translationDir}
+                      >
+                        {translationText}
                       </p>
+                      {translationLang !== "en" && translationText === ayah.translation_en && (
+                        <p className="mt-1 text-[10px] text-muted-foreground">
+                          English fallback shown.
+                        </p>
+                      )}
                     </div>
                   )}
 

@@ -7,7 +7,8 @@ import { ENABLE_LOCALIZED_LANGUAGES } from "@/lib/feature-flags";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { useArabicFont } from "@/lib/useArabicFont";
-import { CURATED_HADITHS, getHadithLearningTier, getHadithSourceName } from "@/lib/hadiths";
+import { getHadithLearningTier, getHadithSourceName } from "@/lib/hadiths";
+import { searchHadiths } from "@/lib/hadith-api";
 import { getHadithTierConfig, getHadithTierSlug, HadithLearningTier } from "@/lib/hadith-tiers";
 import { DUAS } from "@/lib/duas";
 import { addBookmark, getBookmarks, removeBookmark } from "@/lib/bookmarks";
@@ -103,15 +104,11 @@ export default function SearchPage() {
 
       const lower = q.toLowerCase();
 
-      // Hadith search (local)
-      const hadithMatches = CURATED_HADITHS.filter(
-        (h) =>
-          h.english_text.toLowerCase().includes(lower) ||
-          h.arabic_text.includes(q) ||
-          h.narrator_en.toLowerCase().includes(lower) ||
-          h.collection.toLowerCase().includes(lower)
-      );
-      setHadithResults(hadithMatches);
+      try {
+        setHadithResults(await searchHadiths(q, 50));
+      } catch {
+        setHadithResults([]);
+      }
 
       // Dua search (local)
       const duaMatches = DUAS.filter(

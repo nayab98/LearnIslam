@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
+    "check:arabic-text": "node scripts/check-arabic-text.mjs",
     "smoke:routes": "node scripts/smoke-routes.mjs"
   },
   "dependencies": {

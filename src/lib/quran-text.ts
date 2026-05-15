@@ -1,22 +1,23 @@
 export const CANONICAL_BISMILLAH = "بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ";
 
-const UNSUPPORTED_QURAN_SIGNS = /[\u06D6-\u06ED\u08D4-\u08FF]/g;
 const ARABIC_DIACRITICS = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u08D4-\u08FF]/g;
 const DIRECTIONAL_FORMATTING = /[\u200B-\u200F\u202A-\u202E]/g;
 const TATWEEL = /\u0640/g;
 const ALEF_VARIANTS = /[\u0622\u0623\u0625\u0671]/g;
 
+// Quran text is source-driven. Preserve mushaf signs, madd, dagger alif, and
+// other Quranic marks; only remove invisible formatting characters.
 export function cleanQuranText(text: string) {
   return text
-    .replace(UNSUPPORTED_QURAN_SIGNS, "")
     .replace(DIRECTIONAL_FORMATTING, "")
     .replace(/\s+/g, " ")
     .trim();
 }
 
+// Hadith, dua, and vocabulary text may have reviewed tashkeel/madd. Preserve
+// supplied marks and clean only characters that can break display direction.
 export function cleanArabicTextForDisplay(text: string) {
   return text
-    .replace(UNSUPPORTED_QURAN_SIGNS, "")
     .replace(DIRECTIONAL_FORMATTING, "")
     .replace(/\s+/g, " ")
     .trim();

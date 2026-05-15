@@ -5,8 +5,7 @@ import Link from "next/link";
 import { ArrowRight, BookOpenText, Zap, Target, Trophy } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
-import { getHadithsByLearningTier } from "@/lib/hadiths";
-import { getHadithCount } from "@/lib/hadith-api";
+import { getHadithCounts } from "@/lib/hadith-api";
 import { HADITH_TIER_CONFIGS, HadithLearningTier } from "@/lib/hadith-tiers";
 
 const tierStyles: Record<HadithLearningTier, {
@@ -41,24 +40,17 @@ const tierStyles: Record<HadithLearningTier, {
 
 export default function HadeesPage() {
   const { lang } = useLanguage();
-  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [counts, setCounts] = useState<Record<string, number>>(() =>
+    Object.fromEntries(HADITH_TIER_CONFIGS.map((tier) => [tier.id, 0])),
+  );
 
   useEffect(() => {
     async function loadCounts() {
-      const result: Record<string, number> = {};
-      for (const tier of HADITH_TIER_CONFIGS) {
-        try {
-          const c = await getHadithCount(tier.id);
-          if (c > 0) {
-            result[tier.id] = c;
-          } else {
-            throw new Error("zero");
-          }
-        } catch {
-          result[tier.id] = getHadithsByLearningTier(tier.id).length;
-        }
+      try {
+        setCounts(await getHadithCounts());
+      } catch {
+        setCounts(Object.fromEntries(HADITH_TIER_CONFIGS.map((tier) => [tier.id, 0])));
       }
-      setCounts(result);
     }
     loadCounts();
   }, []);
