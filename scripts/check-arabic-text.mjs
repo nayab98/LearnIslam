@@ -10,7 +10,7 @@ const QURAN_TEXT_FILE = path.join(ROOT, "src", "lib", "quran-text.ts");
 
 const ARABIC_LETTERS = /[\u0621-\u064A\u066E-\u06D3\u06FA-\u06FF]/;
 const ARABIC_DIACRITICS = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u08D4-\u08FF]/;
-const QURAN_SIGNS = /[\u06D6-\u06ED\u08D4-\u08FF]/;
+const PRONUNCIATION_MARKS = /[\u0670\u06E4-\u06E6\u06E8\u08D4-\u08FF]/;
 const DIRECTIONAL_FORMATTING = /[\u200B-\u200F\u202A-\u202E]/g;
 
 const EXPECTED_MARK_PATTERNS = [
@@ -107,15 +107,15 @@ function extractLiteralFromTs(filePath, exportName, openToken = "[", closeToken 
 function checkQuranCleaner() {
   const source = read(QURAN_TEXT_FILE);
   if (source.includes(".replace(UNSUPPORTED_QURAN_SIGNS") || source.includes(".replace(QURAN_SIGNS")) {
-    addWarning("src/lib/quran-text.ts", "cleanQuranText", "Quran cleaner appears to strip Quranic signs", "");
+    addWarning("src/lib/quran-text.ts", "cleanQuranText", "Quran cleaner appears to strip the broad Quranic sign range", "");
   }
 
-  const sample = "وَلَا الضَّاۤلِّيْنَ ۝";
-  if (!QURAN_SIGNS.test(sample)) return;
+  const sample = "اللّٰهِ وَلَا الضَّاۤلِّيْنَ";
+  if (!PRONUNCIATION_MARKS.test(sample)) return;
 
   const cleaned = normalizeWhitespace(sample);
-  if (!QURAN_SIGNS.test(cleaned)) {
-    addWarning("src/lib/quran-text.ts", "sample", "Quranic signs were stripped from sample text", sample);
+  if (!PRONUNCIATION_MARKS.test(cleaned)) {
+    addWarning("src/lib/quran-text.ts", "sample", "Quran pronunciation marks were stripped from sample text", sample);
   }
 }
 

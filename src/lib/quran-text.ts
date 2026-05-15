@@ -2,13 +2,15 @@ export const CANONICAL_BISMILLAH = "بِسْمِ اللّٰهِ الرَّحْم
 
 const ARABIC_DIACRITICS = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u08D4-\u08FF]/g;
 const DIRECTIONAL_FORMATTING = /[\u200B-\u200F\u202A-\u202E]/g;
+const QURAN_ORNAMENTS = /[\u06DD\u06DE\u06E9]/g;
 const TATWEEL = /\u0640/g;
 const ALEF_VARIANTS = /[\u0622\u0623\u0625\u0671]/g;
 
 // Quran text is source-driven. Preserve mushaf signs, madd, dagger alif, and
-// other Quranic marks; only remove invisible formatting characters.
+// other pronunciation marks; remove only inline ornaments and invisible junk.
 export function cleanQuranText(text: string) {
   return text
+    .replace(QURAN_ORNAMENTS, "")
     .replace(DIRECTIONAL_FORMATTING, "")
     .replace(/\s+/g, " ")
     .trim();
